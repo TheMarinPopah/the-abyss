@@ -40,16 +40,18 @@ window.addEventListener('DOMContentLoaded', () => {
     const gameScreen = document.getElementById('game-screen');
     const winScreen = document.getElementById('win-screen');
     const joinScreen = document.getElementById('join-screen');
+    const waitingScreen = document.getElementById('waiting-screen'); // New
 
     // Buttons
     const startBtn = document.getElementById('start-btn');
     const hostBtn = document.getElementById('host-btn');
-    const hostStartBtn = document.getElementById('host-start-btn'); // New Button
+    const hostStartBtn = document.getElementById('host-start-btn');
     const joinMenuBtn = document.getElementById('join-menu-btn');
     const joinBtn = document.getElementById('join-btn');
     const guideBtn = document.getElementById('guide-btn');
     const backBtn = document.getElementById('back-btn');
     const backFromJoinBtn = document.getElementById('back-from-join-btn');
+    const backFromWaitingBtn = document.getElementById('back-from-waiting-btn'); // New
     const restartBtn = document.getElementById('restart-btn');
     
     // UI Elements
@@ -58,7 +60,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const hostCodeDisplay = document.getElementById('host-code');
     const hostInfoDiv = document.getElementById('host-info');
     const joinInput = document.getElementById('join-code-input');
-    const joinStatus = document.getElementById('join-status'); // Status text
+    const joinError = document.getElementById('join-error'); // New
 
     // Slider Elements
     const sliderThumb = document.getElementById('slider-thumb');
@@ -225,7 +227,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 console.log('Hosting with code:', id);
                 hostCodeDisplay.textContent = id;
                 hostInfoDiv.style.display = 'block';
-                // Host generates maze immediately
                 maze = generateMaze(state.mazeSize, state.mazeSize);
             });
             
@@ -251,11 +252,11 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if (isHost) {
                 connections.push(conn);
-                // Send maze to the new player immediately, but DO NOT start yet
                 conn.send({ type: 'maze', data: maze });
             } else {
                 myConn = conn;
-                // Joiner waits for data
+                // Joiner successfully connected -> Go to waiting screen
+                showScreen('waiting');
             }
         });
 
@@ -272,18 +273,21 @@ window.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             }
         });
+        
+        conn.on('error', () => {
+            if (!isHost) {
+                joinError.textContent = "Connection failed.";
+                joinError.style.display = 'block';
+                showScreen('join');
+            }
+        });
     }
 
     function handleData(data, senderId) {
         if (data.type === 'maze') {
-            // Joiner receives maze
             maze = data.data;
-            // Show "Waiting" status
-            joinStatus.style.display = 'block';
-            joinStatus.textContent = "Connected! Waiting for host to start...";
         }
         else if (data.type === 'start') {
-            // Joiner receives start signal
             startGame();
         }
         else if (data.type === 'move') {
@@ -511,12 +515,14 @@ window.addEventListener('DOMContentLoaded', () => {
         gameScreen.classList.remove('active');
         winScreen.classList.remove('active');
         joinScreen.classList.remove('active');
+        waitingScreen.classList.remove('active');
         
         if (name === 'menu') menuScreen.classList.add('active');
         if (name === 'guide') guideScreen.classList.add('active');
         if (name === 'game') gameScreen.classList.add('active');
         if (name === 'win') winScreen.classList.add('active');
         if (name === 'join') joinScreen.classList.add('active');
+        if (name === 'waiting') waitingScreen.classList.add('active');
     }
 
     function startGame() {
@@ -547,14 +553,15 @@ window.addEventListener('DOMContentLoaded', () => {
         initNetworking(true);
     });
 
-    // Host Start Button (Trigger for everyone)
+    // Host Start Button
     hostStartBtn.addEventListener('click', () => {
-        startGame(); // Start for host
-        broadcastData({ type: 'start' }); // Tell everyone else to start
+        startGame();
+        broadcastData({ type: 'start' });
     });
 
     // Join Menu Button
     joinMenuBtn.addEventListener('click', () => {
+        joinError.style.display = 'none';
         showScreen('join');
     });
 
@@ -562,7 +569,8 @@ window.addEventListener('DOMContentLoaded', () => {
     joinBtn.addEventListener('click', () => {
         const hostCode = joinInput.value.trim();
         if (!hostCode) {
-            alert("Please enter a code.");
+            joinError.textContent = "PLEASE ENTER A CODE";
+            joinError.style.display = 'block';
             return;
         }
         
@@ -572,6 +580,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         isHost = false;
+        joinError.style.display = 'none';
         
         peer = new Peer();
         
@@ -579,17 +588,41 @@ window.addEventListener('DOMContentLoaded', () => {
             myId = id;
             const conn = peer.connect(hostCode);
             myConn = conn;
+            
+            // If connection fails (invalid code usually triggers this quickly or times out)
+            conn.on('error', (err) => {
+                joinError.textContent = "INVALID CODE";
+                joinError.style.display = 'block';
+                showScreen('join');
+            });
+            
             setupConnection(conn);
         });
         
         peer.on('error', (err) => {
-            alert("Connection failed. Check code.\nError: " + err.type);
+            // Specific check for invalid peer ID (could be "peer-unavailable" or "invalid-id")
+            if (err.type === 'peer-unavailable') {
+                joinError.textContent = "INVALID CODE";
+            } else {
+                joinError.textContent = "CONNECTION ERROR";
+            }
+            joinError.style.display = 'block';
+            showScreen('join');
         });
     });
-
+    
+    // Back Buttons
     guideBtn.addEventListener('click', () => showScreen('guide'));
     backBtn.addEventListener('click', () => showScreen('menu'));
     backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
+    
+    backFromWaitingBtn.addEventListener('click', () => {
+        // Clean up connection if leaving waiting screen
+        if(peer) peer.destroy();
+        peer = null;
+        myConn = null;
+        showScreen('menu');
+    });
     
     restartBtn.addEventListener('click', () => {
         if(peer) peer.destroy();
