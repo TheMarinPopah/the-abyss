@@ -38,7 +38,6 @@
                         <p class="code-label">YOUR GAME CODE:</p>
                         <p id="host-code" class="code-display">LOADING...</p>
                         <p class="code-hint">Share this code with friends. Click START when ready.</p>
-                        <!-- START BUTTON FOR HOST -->
                         <button id="host-start-btn" class="btn btn-primary" style="margin-top: 1rem;">START GAME</button>
                     </div>
                 </div>
@@ -55,11 +54,21 @@
             <p class="guide-hint">Enter the 6-digit code provided by your friend.</p>
             <div class="multiplayer-section" style="margin-top: 2rem;">
                 <input type="text" id="join-code-input" class="text-input" placeholder="ENTER CODE" maxlength="6">
+                <!-- Error Message Container -->
+                <p id="join-error" class="error-msg" style="display: none; margin-top: 0.5rem;">INVALID CODE</p>
                 <button id="join-btn" class="btn btn-primary" style="margin-top: 1rem;">CONNECT</button>
             </div>
-            <!-- Status message for the joiner -->
-            <p id="join-status" class="code-hint" style="margin-top: 1rem; display: none;">Connected! Waiting for host to start...</p>
             <button id="back-from-join-btn" class="btn btn-secondary" style="margin-top: 2rem;">BACK</button>
+        </div>
+    </div>
+
+    <!-- WAITING SCREEN (New) -->
+    <div id="waiting-screen" class="screen">
+        <div class="guide-container">
+            <h2 class="guide-title" style="color: #4a8c4a;">CONNECTED</h2>
+            <p class="guide-hint" style="margin-top: 1rem;">Waiting for host to start the game...</p>
+            <div class="loader" style="margin-top: 2rem;"></div>
+            <button id="back-from-waiting-btn" class="btn btn-secondary" style="margin-top: 2rem;">CANCEL</button>
         </div>
     </div>
 
