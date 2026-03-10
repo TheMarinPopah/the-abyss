@@ -33,24 +33,66 @@ window.addEventListener('DOMContentLoaded', () => {
     let isHost = false;
     let otherPlayers = {}; 
     let myId = null;
-    let isWaitingForMaze = false;
 
     // DOM Elements
     const menuScreen = document.getElementById('menu-screen');
     const guideScreen = document.getElementById('guide-screen');
     const gameScreen = document.getElementById('game-screen');
     const winScreen = document.getElementById('win-screen');
+    const joinScreen = document.getElementById('join-screen'); // New
+
+    // Buttons
     const startBtn = document.getElementById('start-btn');
     const hostBtn = document.getElementById('host-btn');
+    const joinMenuBtn = document.getElementById('join-menu-btn'); // New
     const joinBtn = document.getElementById('join-btn');
     const guideBtn = document.getElementById('guide-btn');
     const backBtn = document.getElementById('back-btn');
+    const backFromJoinBtn = document.getElementById('back-from-join-btn'); // New
     const restartBtn = document.getElementById('restart-btn');
+    
+    // UI Elements
     const distanceCounter = document.getElementById('distance-counter');
     const gameContainer = document.getElementById('game-container');
     const hostCodeDisplay = document.getElementById('host-code');
     const hostInfoDiv = document.getElementById('host-info');
     const joinInput = document.getElementById('join-code-input');
+
+    // Slider Elements
+    const sliderThumb = document.getElementById('slider-thumb');
+    const labelSingle = document.getElementById('label-single');
+    const labelMulti = document.getElementById('label-multi');
+    const singleControls = document.getElementById('single-player-controls');
+    const multiControls = document.getElementById('multiplayer-controls');
+    
+    let isMultiplayerMode = false;
+
+    // --- Slider Logic ---
+    function setMode(multi) {
+        isMultiplayerMode = multi;
+        if (multi) {
+            sliderThumb.classList.add('right');
+            labelMulti.classList.add('active');
+            labelSingle.classList.remove('active');
+            singleControls.classList.remove('active');
+            multiControls.classList.add('active');
+        } else {
+            sliderThumb.classList.remove('right');
+            labelSingle.classList.add('active');
+            labelMulti.classList.remove('active');
+            singleControls.classList.add('active');
+            multiControls.classList.remove('active');
+        }
+    }
+
+    labelSingle.addEventListener('click', () => setMode(false));
+    labelMulti.addEventListener('click', () => setMode(true));
+    sliderThumb.parentElement.addEventListener('click', (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        if (clickX < rect.width / 2) setMode(false);
+        else setMode(true);
+    });
 
     // --- Generate 6-Digit Room Code ---
     function generateRoomCode() {
@@ -61,23 +103,19 @@ window.addEventListener('DOMContentLoaded', () => {
     function createCharacterMesh(color = 0xffffff) {
         const group = new THREE.Group();
         
-        // Body (rounded capsule-like shape)
+        // Body
         const bodyGeo = new THREE.CapsuleGeometry(0.35, 0.8, 8, 16);
         const bodyMat = new THREE.MeshToonMaterial({ 
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.1
+            color: color, emissive: color, emissiveIntensity: 0.1
         });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.7;
         group.add(body);
         
-        // Head (sphere)
+        // Head
         const headGeo = new THREE.SphereGeometry(0.4, 16, 16);
         const headMat = new THREE.MeshToonMaterial({ 
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.1
+            color: color, emissive: color, emissiveIntensity: 0.1
         });
         const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 1.55;
@@ -95,7 +133,7 @@ window.addEventListener('DOMContentLoaded', () => {
         rightEye.position.set(0.12, 1.6, 0.32);
         group.add(rightEye);
         
-        // Eye highlights
+        // Highlights
         const highlightGeo = new THREE.SphereGeometry(0.03, 6, 6);
         const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         
@@ -107,31 +145,21 @@ window.addEventListener('DOMContentLoaded', () => {
         rightHighlight.position.set(0.14, 1.63, 0.38);
         group.add(rightHighlight);
         
-        // Arms (simple rounded shapes)
+        // Arms
         const armGeo = new THREE.CapsuleGeometry(0.1, 0.4, 4, 8);
-        const armMat = new THREE.MeshToonMaterial({ 
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.1
-        });
-        
-        const leftArm = new THREE.Mesh(armGeo, armMat);
+        const leftArm = new THREE.Mesh(armGeo, bodyMat);
         leftArm.position.set(-0.5, 0.9, 0);
         leftArm.rotation.z = 0.3;
         group.add(leftArm);
         
-        const rightArm = new THREE.Mesh(armGeo, armMat);
+        const rightArm = new THREE.Mesh(armGeo, bodyMat);
         rightArm.position.set(0.5, 0.9, 0);
         rightArm.rotation.z = -0.3;
         group.add(rightArm);
         
-        // Cheek blush (subtle)
+        // Blush
         const blushGeo = new THREE.CircleGeometry(0.06, 8);
-        const blushMat = new THREE.MeshBasicMaterial({ 
-            color: 0xffaaaa, 
-            transparent: true, 
-            opacity: 0.4 
-        });
+        const blushMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.4 });
         
         const leftBlush = new THREE.Mesh(blushGeo, blushMat);
         leftBlush.position.set(-0.25, 1.52, 0.35);
@@ -142,17 +170,6 @@ window.addEventListener('DOMContentLoaded', () => {
         rightBlush.position.set(0.25, 1.52, 0.35);
         rightBlush.lookAt(0.25, 1.52, 1);
         group.add(rightBlush);
-        
-        // Add a subtle glow
-        const glowGeo = new THREE.SphereGeometry(0.8, 16, 16);
-        const glowMat = new THREE.MeshBasicMaterial({ 
-            color: color,
-            transparent: true,
-            opacity: 0.05
-        });
-        const glow = new THREE.Mesh(glowGeo, glowMat);
-        glow.position.y = 1.1;
-        group.add(glow);
         
         return group;
     }
@@ -178,7 +195,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         carve(1, 1);
 
-        // Seal edges
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
@@ -193,11 +209,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function initNetworking(hosting) {
         if (typeof Peer === 'undefined') {
-            alert("Multiplayer failed to load. Please check your internet connection and refresh.");
+            alert("Multiplayer failed to load. Please check your internet connection.");
             return;
         }
 
-        // For hosting, generate a 6-digit code as peer ID
         if (hosting) {
             const roomCode = generateRoomCode();
             peer = new Peer(roomCode);
@@ -208,15 +223,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 console.log('Hosting with code:', id);
                 hostCodeDisplay.textContent = id;
                 hostInfoDiv.style.display = 'block';
-                // Pre-generate maze for host
+                // Host generates maze immediately
                 maze = generateMaze(state.mazeSize, state.mazeSize);
             });
             
             peer.on('error', (err) => {
                 console.error(err);
                 if (err.type === 'unavailable-id') {
-                    // Code already taken, try another
-                    hostCodeDisplay.textContent = "Try again...";
+                    hostCodeDisplay.textContent = "Retrying...";
                     initNetworking(true);
                 } else {
                     alert('Multiplayer Error: ' + err.type);
@@ -235,10 +249,13 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if (isHost) {
                 connections.push(conn);
-                // Send the maze to the new player immediately
+                // Send maze to the new player
                 conn.send({ type: 'maze', data: maze });
+                // Host starts the game immediately when someone joins
+                startGame();
             } else {
                 myConn = conn;
+                // Joiner waits for maze data (handled in handleData)
             }
         });
 
@@ -259,20 +276,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function handleData(data, senderId) {
         if (data.type === 'maze') {
-            // FIX: Receive maze BEFORE starting game
+            // Joiner receives maze
             maze = data.data;
-            mazeReceived = true;
-            
-            // Now we can start the game
-            if (isWaitingForMaze) {
-                isWaitingForMaze = false;
-                startGame();
-            }
+            // Joiner starts game now
+            startGame();
         }
         else if (data.type === 'move') {
             updateOtherPlayer(senderId, data.x, data.z, data.angle);
-            
-            // If I am host, relay this position to everyone else
             if (isHost) {
                 broadcastData({ type: 'move', id: senderId, x: data.x, z: data.z, angle: data.angle }, senderId);
             }
@@ -295,7 +305,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (id === myId) return; 
 
         if (!otherPlayers[id]) {
-            // Create cute character for other player (slightly different color)
             const mesh = createCharacterMesh(0xffeedd);
             scene.add(mesh);
             otherPlayers[id] = { mesh, x, z, angle };
@@ -329,7 +338,6 @@ window.addEventListener('DOMContentLoaded', () => {
         
         clock = new THREE.Clock();
         
-        // Slightly brighter ambient for character visibility
         const ambientLight = new THREE.AmbientLight(0x333333, 0.3); 
         scene.add(ambientLight);
         
@@ -339,7 +347,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         createFloor();
         
-        // If maze doesn't exist (Single Player or Host), generate it
+        // Safety check: generate maze if missing (shouldn't happen with fixed logic)
         if (maze.length === 0) {
             maze = generateMaze(state.mazeSize, state.mazeSize);
         }
@@ -347,11 +355,9 @@ window.addEventListener('DOMContentLoaded', () => {
         createWalls();
         createDustParticles();
         
-        // Create player character mesh
         playerMesh = createCharacterMesh(0xffffff);
         scene.add(playerMesh);
         
-        // Reset player position
         player.x = 1.5 * state.cellSize;
         player.z = 1.5 * state.cellSize;
         player.angle = 0;
@@ -381,10 +387,7 @@ window.addEventListener('DOMContentLoaded', () => {
             for (let x = 0; x < state.mazeSize; x++) {
                 if (maze[y][x] === 1) {
                     const wallMat = new THREE.MeshStandardMaterial({ 
-                        color: 0x111111,
-                        emissive: 0xffffff,
-                        emissiveIntensity: 0.05,
-                        roughness: 0.8
+                        color: 0x111111, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.8
                     });
                     
                     const wall = new THREE.Mesh(wallGeo, wallMat);
@@ -393,12 +396,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     walls.push(wall);
                     
                     const edges = new THREE.EdgesGeometry(wallGeo);
-                    const lineMat = new THREE.LineBasicMaterial({ 
-                        color: 0xffffff,
-                        linewidth: 1,
-                        transparent: true,
-                        opacity: 0.8
-                    });
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
                     const line = new THREE.LineSegments(edges, lineMat);
                     line.position.copy(wall.position);
                     scene.add(line);
@@ -428,7 +426,6 @@ window.addEventListener('DOMContentLoaded', () => {
         camera.rotation.y = player.angle;
         playerLight.position.set(player.x, 2, player.z);
         
-        // Update player mesh position
         if (playerMesh) {
             playerMesh.position.set(player.x, 0, player.z);
             playerMesh.rotation.y = player.angle;
@@ -480,7 +477,6 @@ window.addEventListener('DOMContentLoaded', () => {
         
         updateCamera();
 
-        // Multiplayer: Send position
         if (isHost) {
             broadcastData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle });
         } else if (myConn && myConn.open) {
@@ -500,11 +496,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (state.isPlaying) {
             movePlayer(delta);
             playerLight.intensity = 1.5 + Math.sin(time * 10) * 0.1 + Math.sin(time * 23) * 0.05;
-            
-            // Animate player character (subtle bob)
-            if (playerMesh) {
-                playerMesh.position.y = Math.sin(time * 3) * 0.03;
-            }
+            if (playerMesh) playerMesh.position.y = Math.sin(time * 3) * 0.03;
         }
         renderer.render(scene, camera);
     }
@@ -514,11 +506,13 @@ window.addEventListener('DOMContentLoaded', () => {
         guideScreen.classList.remove('active');
         gameScreen.classList.remove('active');
         winScreen.classList.remove('active');
+        joinScreen.classList.remove('active');
         
         if (name === 'menu') menuScreen.classList.add('active');
         if (name === 'guide') guideScreen.classList.add('active');
         if (name === 'game') gameScreen.classList.add('active');
         if (name === 'win') winScreen.classList.add('active');
+        if (name === 'join') joinScreen.classList.add('active');
     }
 
     function startGame() {
@@ -536,20 +530,29 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
+
+    // Single Player Start
     startBtn.addEventListener('click', () => {
         isHost = false;
-        mazeReceived = true; // Single player doesn't need to wait
+        maze = []; // Clear maze to generate fresh
         startGame();
     });
 
+    // Host Button
     hostBtn.addEventListener('click', () => {
         initNetworking(true);
     });
 
+    // Join Menu Button (opens Join Screen)
+    joinMenuBtn.addEventListener('click', () => {
+        showScreen('join');
+    });
+
+    // Join Confirm Button (on Join Screen)
     joinBtn.addEventListener('click', () => {
         const hostCode = joinInput.value.trim();
         if (!hostCode) {
-            alert("Please enter a 6-digit Host Code");
+            alert("Please enter a code.");
             return;
         }
         
@@ -559,28 +562,25 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         isHost = false;
-        isWaitingForMaze = true;
         
-        // Initialize Peer connection with a random ID (we're joining, not hosting)
         peer = new Peer();
         
         peer.on('open', (id) => {
             myId = id;
-            console.log("Joining game with code:", hostCode);
-            
-            // Connect to host using the 6-digit code
             const conn = peer.connect(hostCode);
             myConn = conn;
             setupConnection(conn);
         });
         
         peer.on('error', (err) => {
-            alert("Could not connect to Host. Check the code.\nError: " + err.type);
+            alert("Connection failed. Check code.\nError: " + err.type);
         });
     });
 
     guideBtn.addEventListener('click', () => showScreen('guide'));
     backBtn.addEventListener('click', () => showScreen('menu'));
+    backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
+    
     restartBtn.addEventListener('click', () => {
         if(peer) peer.destroy();
         peer = null;
@@ -588,8 +588,6 @@ window.addEventListener('DOMContentLoaded', () => {
         connections = [];
         myConn = null;
         maze = [];
-        mazeReceived = false;
-        isWaitingForMaze = false;
         showScreen('menu');
     });
 
