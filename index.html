@@ -3,16 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>THE ABYSS</title>
+    <title>THE ABYSS - MULTIPLAYER</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="menu-screen" class="screen active">
         <div class="menu-container">
             <h1 class="game-title">THE ABYSS</h1>
-            <p class="subtitle">Find your way out... if you can.</p>
+            <p class="subtitle">Survive the dark together.</p>
+            
             <div class="menu-buttons">
-                <button id="start-btn" class="btn btn-primary">START</button>
+                <button id="start-btn" class="btn btn-primary">SINGLE PLAYER</button>
+                
+                <div class="multiplayer-section">
+                    <button id="host-btn" class="btn btn-secondary">HOST GAME</button>
+                    <div id="host-info" style="display:none;">
+                        <p class="code-label">YOUR GAME CODE:</p>
+                        <p id="host-code" class="code-display">LOADING...</p>
+                        <p class="code-hint">Share this code with friends.</p>
+                    </div>
+                </div>
+
+                <div class="multiplayer-section">
+                    <input type="text" id="join-code-input" class="text-input" placeholder="ENTER HOST CODE">
+                    <button id="join-btn" class="btn btn-secondary">JOIN GAME</button>
+                </div>
+
                 <button id="guide-btn" class="btn btn-secondary">GUIDE</button>
             </div>
         </div>
@@ -24,31 +40,23 @@
             <h2 class="guide-title">CONTROLS</h2>
             <div class="controls-list">
                 <div class="control-item">
-                    <span class="key-group">
-                        <span class="key">W</span> / <span class="key">UP</span>
-                    </span>
+                    <span class="key-group"><span class="key">W</span> / <span class="key">UP</span></span>
                     <span class="control-desc">Move Forward</span>
                 </div>
                 <div class="control-item">
-                    <span class="key-group">
-                        <span class="key">S</span> / <span class="key">DOWN</span>
-                    </span>
+                    <span class="key-group"><span class="key">S</span> / <span class="key">DOWN</span></span>
                     <span class="control-desc">Move Backward</span>
                 </div>
                 <div class="control-item">
-                    <span class="key-group">
-                        <span class="key">A</span> / <span class="key">LEFT</span>
-                    </span>
+                    <span class="key-group"><span class="key">A</span> / <span class="key">LEFT</span></span>
                     <span class="control-desc">Turn Left</span>
                 </div>
                 <div class="control-item">
-                    <span class="key-group">
-                        <span class="key">D</span> / <span class="key">RIGHT</span>
-                  </span>
+                    <span class="key-group"><span class="key">D</span> / <span class="key">RIGHT</span></span>
                     <span class="control-desc">Turn Right</span>
                 </div>
             </div>
-            <p class="guide-hint">Navigate through the darkness. Find the exit.</p>
+            <p class="guide-hint">Host a game to get a code, or join a friend's game.</p>
             <button id="back-btn" class="btn btn-secondary">BACK</button>
         </div>
     </div>
@@ -68,12 +76,14 @@
     <div id="win-screen" class="screen">
         <div class="win-container">
             <h2 class="win-title">ESCAPED</h2>
-            <p class="win-text">You found your way out of the abyss.</p>
+            <p class="win-text">You found your way out.</p>
             <button id="restart-btn" class="btn btn-primary">PLAY AGAIN</button>
         </div>
     </div>
 
+    <!-- Libraries -->
     <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
