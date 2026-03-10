@@ -40,7 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const gameScreen = document.getElementById('game-screen');
     const winScreen = document.getElementById('win-screen');
     const joinScreen = document.getElementById('join-screen');
-    const waitingScreen = document.getElementById('waiting-screen'); // New
+    const waitingScreen = document.getElementById('waiting-screen');
 
     // Buttons
     const startBtn = document.getElementById('start-btn');
@@ -51,7 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const guideBtn = document.getElementById('guide-btn');
     const backBtn = document.getElementById('back-btn');
     const backFromJoinBtn = document.getElementById('back-from-join-btn');
-    const backFromWaitingBtn = document.getElementById('back-from-waiting-btn'); // New
+    const backFromWaitingBtn = document.getElementById('back-from-waiting-btn');
     const restartBtn = document.getElementById('restart-btn');
     
     // UI Elements
@@ -60,7 +60,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const hostCodeDisplay = document.getElementById('host-code');
     const hostInfoDiv = document.getElementById('host-info');
     const joinInput = document.getElementById('join-code-input');
-    const joinError = document.getElementById('join-error'); // New
+    const joinError = document.getElementById('join-error');
 
     // Slider Elements
     const sliderThumb = document.getElementById('slider-thumb');
@@ -216,10 +216,13 @@ window.addEventListener('DOMContentLoaded', () => {
             alert("Multiplayer failed to load. Please check your internet connection.");
             return;
         }
+        
+        // FIX: Force secure connection for GitHub Pages (HTTPS)
+        const peerOptions = { secure: true, debug: 2 };
 
         if (hosting) {
             const roomCode = generateRoomCode();
-            peer = new Peer(roomCode);
+            peer = new Peer(roomCode, peerOptions);
             isHost = true;
             
             peer.on('open', (id) => {
@@ -235,6 +238,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (err.type === 'unavailable-id') {
                     hostCodeDisplay.textContent = "Retrying...";
                     initNetworking(true);
+                } else if (err.type === 'network') {
+                    alert('Network Error: Could not connect to server. Please check your internet connection or try a different browser.');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
                 }
@@ -255,7 +260,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 conn.send({ type: 'maze', data: maze });
             } else {
                 myConn = conn;
-                // Joiner successfully connected -> Go to waiting screen
                 showScreen('waiting');
             }
         });
@@ -526,136 +530,3 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function startGame() {
-        state.isPlaying = true;
-        state.distance = 0;
-        distanceCounter.textContent = '0';
-        
-        if (renderer) {
-            gameContainer.removeChild(renderer.domElement);
-            renderer.dispose();
-        }
-        
-        showScreen('game');
-        initThree();
-    }
-
-    // --- Event Listeners ---
-
-    // Single Player Start
-    startBtn.addEventListener('click', () => {
-        isHost = false;
-        maze = []; 
-        startGame();
-    });
-
-    // Host Button
-    hostBtn.addEventListener('click', () => {
-        initNetworking(true);
-    });
-
-    // Host Start Button
-    hostStartBtn.addEventListener('click', () => {
-        startGame();
-        broadcastData({ type: 'start' });
-    });
-
-    // Join Menu Button
-    joinMenuBtn.addEventListener('click', () => {
-        joinError.style.display = 'none';
-        showScreen('join');
-    });
-
-    // Join Confirm Button
-    joinBtn.addEventListener('click', () => {
-        const hostCode = joinInput.value.trim();
-        if (!hostCode) {
-            joinError.textContent = "PLEASE ENTER A CODE";
-            joinError.style.display = 'block';
-            return;
-        }
-        
-        if (typeof Peer === 'undefined') {
-            alert("Multiplayer failed to load.");
-            return;
-        }
-
-        isHost = false;
-        joinError.style.display = 'none';
-        
-        peer = new Peer();
-        
-        peer.on('open', (id) => {
-            myId = id;
-            const conn = peer.connect(hostCode);
-            myConn = conn;
-            
-            // If connection fails (invalid code usually triggers this quickly or times out)
-            conn.on('error', (err) => {
-                joinError.textContent = "INVALID CODE";
-                joinError.style.display = 'block';
-                showScreen('join');
-            });
-            
-            setupConnection(conn);
-        });
-        
-        peer.on('error', (err) => {
-            // Specific check for invalid peer ID (could be "peer-unavailable" or "invalid-id")
-            if (err.type === 'peer-unavailable') {
-                joinError.textContent = "INVALID CODE";
-            } else {
-                joinError.textContent = "CONNECTION ERROR";
-            }
-            joinError.style.display = 'block';
-            showScreen('join');
-        });
-    });
-    
-    // Back Buttons
-    guideBtn.addEventListener('click', () => showScreen('guide'));
-    backBtn.addEventListener('click', () => showScreen('menu'));
-    backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
-    
-    backFromWaitingBtn.addEventListener('click', () => {
-        // Clean up connection if leaving waiting screen
-        if(peer) peer.destroy();
-        peer = null;
-        myConn = null;
-        showScreen('menu');
-    });
-    
-    restartBtn.addEventListener('click', () => {
-        if(peer) peer.destroy();
-        peer = null;
-        isHost = false;
-        connections = [];
-        myConn = null;
-        maze = [];
-        showScreen('menu');
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (!state.isPlaying) return;
-        if (e.code === 'KeyW' || e.code === 'ArrowUp') { state.keys.forward = true; e.preventDefault(); }
-        if (e.code === 'KeyS' || e.code === 'ArrowDown') { state.keys.backward = true; e.preventDefault(); }
-        if (e.code === 'KeyA' || e.code === 'ArrowLeft') { state.keys.left = true; e.preventDefault(); }
-        if (e.code === 'KeyD' || e.code === 'ArrowRight') { state.keys.right = true; e.preventDefault(); }
-    });
-
-    document.addEventListener('keyup', (e) => {
-        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.forward = false;
-        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.backward = false;
-        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.left = false;
-        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.right = false;
-    });
-
-    window.addEventListener('resize', () => {
-        if (camera && renderer) {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-    });
-
-    showScreen('menu');
-});
