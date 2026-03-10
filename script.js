@@ -217,8 +217,13 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // FIX: Force secure connection for GitHub Pages (HTTPS)
-        const peerOptions = { secure: true, debug: 2 };
+        // FIX: Explicit server configuration to solve Network Errors on HTTPS
+        const peerOptions = {
+            debug: 2,
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true
+        };
 
         if (hosting) {
             const roomCode = generateRoomCode();
@@ -239,7 +244,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     hostCodeDisplay.textContent = "Retrying...";
                     initNetworking(true);
                 } else if (err.type === 'network') {
-                    alert('Network Error: Could not connect to server. Please check your internet connection or try a different browser.');
+                    alert('Network Error: Could not reach the server. Please check your internet connection or disable AdBlockers.');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
                 }
@@ -530,3 +535,141 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function startGame() {
+        state.isPlaying = true;
+        state.distance = 0;
+        distanceCounter.textContent = '0';
+        
+        if (renderer) {
+            gameContainer.removeChild(renderer.domElement);
+            renderer.dispose();
+        }
+        
+        showScreen('game');
+        initThree();
+    }
+
+    // --- Event Listeners ---
+
+    // Single Player Start
+    startBtn.addEventListener('click', () => {
+        isHost = false;
+        maze = []; 
+        startGame();
+    });
+
+    // Host Button
+    hostBtn.addEventListener('click', () => {
+        initNetworking(true);
+    });
+
+    // Host Start Button
+    hostStartBtn.addEventListener('click', () => {
+        startGame();
+        broadcastData({ type: 'start' });
+    });
+
+    // Join Menu Button
+    joinMenuBtn.addEventListener('click', () => {
+        joinError.style.display = 'none';
+        showScreen('join');
+    });
+
+    // Join Confirm Button
+    joinBtn.addEventListener('click', () => {
+        const hostCode = joinInput.value.trim();
+        if (!hostCode) {
+            joinError.textContent = "PLEASE ENTER A CODE";
+            joinError.style.display = 'block';
+            return;
+        }
+        
+        if (typeof Peer === 'undefined') {
+            alert("Multiplayer failed to load.");
+            return;
+        }
+
+        isHost = false;
+        joinError.style.display = 'none';
+        
+        // FIX: Use same explicit configuration
+        const peerOptions = {
+            debug: 2,
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true
+        };
+        
+        peer = new Peer(peerOptions);
+        
+        peer.on('open', (id) => {
+            myId = id;
+            const conn = peer.connect(hostCode);
+            myConn = conn;
+            
+            conn.on('error', (err) => {
+                joinError.textContent = "INVALID CODE";
+                joinError.style.display = 'block';
+                showScreen('join');
+            });
+            
+            setupConnection(conn);
+        });
+        
+        peer.on('error', (err) => {
+            if (err.type === 'peer-unavailable') {
+                joinError.textContent = "INVALID CODE";
+            } else {
+                joinError.textContent = "CONNECTION ERROR";
+            }
+            joinError.style.display = 'block';
+            showScreen('join');
+        });
+    });
+    
+    // Back Buttons
+    guideBtn.addEventListener('click', () => showScreen('guide'));
+    backBtn.addEventListener('click', () => showScreen('menu'));
+    backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
+    
+    backFromWaitingBtn.addEventListener('click', () => {
+        if(peer) peer.destroy();
+        peer = null;
+        myConn = null;
+        showScreen('menu');
+    });
+    
+    restartBtn.addEventListener('click', () => {
+        if(peer) peer.destroy();
+        peer = null;
+        isHost = false;
+        connections = [];
+        myConn = null;
+        maze = [];
+        showScreen('menu');
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!state.isPlaying) return;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') { state.keys.forward = true; e.preventDefault(); }
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') { state.keys.backward = true; e.preventDefault(); }
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') { state.keys.left = true; e.preventDefault(); }
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') { state.keys.right = true; e.preventDefault(); }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.forward = false;
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.backward = false;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.left = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.right = false;
+    });
+
+    window.addEventListener('resize', () => {
+        if (camera && renderer) {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    });
+
+    showScreen('menu');
+});
