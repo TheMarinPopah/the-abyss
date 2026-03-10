@@ -13,8 +13,8 @@ window.addEventListener('DOMContentLoaded', () => {
         mazeSize: 15,
         cellSize: 4,
         wallHeight: 3,
-        moveSpeed: 0.08,
-        turnSpeed: 0.03,
+        moveSpeed: 6,       // 1.5 walls/sec * 4 units = 6 units/sec
+        turnSpeed: 0.03,    // Reverted to original turn speed
         keys: { forward: false, backward: false, left: false, right: false }
     };
 
@@ -58,7 +58,17 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
         carve(1, 1);
-        grid[height - 2][width - 2] = 0; // Exit
+
+        // --- CHANGE: Seal the map edges ---
+        // This loops through the edges and ensures they are walls (1)
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
+                    grid[y][x] = 1;
+                }
+            }
+        }
+        
         return grid;
     }
 
@@ -66,7 +76,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function initThree() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000000);
-        scene.fog = new THREE.Fog(0x000000, 1, 20); // Fog starts close, ends far
+        scene.fog = new THREE.Fog(0x000000, 1, 20);
         
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.y = 1.5;
@@ -79,11 +89,9 @@ window.addEventListener('DOMContentLoaded', () => {
         clock = new THREE.Clock();
         
         // Lights
-        // Ambient light: Dim gray so things aren't pitch black, but very dark
         const ambientLight = new THREE.AmbientLight(0x222222, 0.2); 
         scene.add(ambientLight);
         
-        // Player Light: Bright white, average range
         playerLight = new THREE.PointLight(0xffffff, 1.5, 15); 
         playerLight.castShadow = true;
         scene.add(playerLight);
@@ -91,29 +99,24 @@ window.addEventListener('DOMContentLoaded', () => {
         createFloor();
         maze = generateMaze(state.mazeSize, state.mazeSize);
         createWalls();
-        createExit();
+        // createExit(); // Removed: No exit needed
         createDustParticles();
         
         player.x = 1.5 * state.cellSize;
         player.z = 1.5 * state.cellSize;
         player.angle = 0;
         
-        exitPosition.x = (state.mazeSize - 2) * state.cellSize + state.cellSize / 2;
-        exitPosition.z = (state.mazeSize - 2) * state.cellSize + state.cellSize / 2;
-        
         updateCamera();
         animate();
     }
 
     function createFloor() {
-        // Floor
         const floorGeo = new THREE.PlaneGeometry(200, 200);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
         
-        // Ceiling
         const ceiling = floor.clone();
         ceiling.position.y = state.wallHeight;
         scene.add(ceiling);
@@ -127,12 +130,10 @@ window.addEventListener('DOMContentLoaded', () => {
         for (let y = 0; y < state.mazeSize; y++) {
             for (let x = 0; x < state.mazeSize; x++) {
                 if (maze[y][x] === 1) {
-                    // Wall Material: Dark base, but with a faint white glow (Emissive)
-                    // This makes them "white in the dark" but dimly lit
                     const wallMat = new THREE.MeshStandardMaterial({ 
-                        color: 0x111111,       // Very dark gray base
-                        emissive: 0xffffff,    // White glow
-                        emissiveIntensity: 0.05, // Faint glow so it's visible in blackness
+                        color: 0x111111,
+                        emissive: 0xffffff,
+                        emissiveIntensity: 0.05,
                         roughness: 0.8
                     });
                     
@@ -141,11 +142,9 @@ window.addEventListener('DOMContentLoaded', () => {
                     scene.add(wall);
                     walls.push(wall);
                     
-                    // NEON WHITE WIREFRAME
-                    // This creates the "Neon" look on the edges
                     const edges = new THREE.EdgesGeometry(wallGeo);
                     const lineMat = new THREE.LineBasicMaterial({ 
-                        color: 0xffffff,     // Bright white lines
+                        color: 0xffffff,
                         linewidth: 1,
                         transparent: true,
                         opacity: 0.8
@@ -166,7 +165,7 @@ window.addEventListener('DOMContentLoaded', () => {
         exit.position.set(exitPosition.x, state.wallHeight/2, exitPosition.z);
         scene.add(exit);
         
-        const exitLight = new THREE.PointLight(0x2a5a2a, 1.0, 10); // Brighter exit light
+        const exitLight = new THREE.PointLight(0x2a5a2a, 1.0, 10);
         exitLight.position.copy(exit.position);
         scene.add(exitLight);
     }
@@ -219,36 +218,49 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function movePlayer() {
+    function movePlayer(delta) {
         if (!state.isPlaying) return;
         
+        // Rotation: Uses original frame-based speed
         if (state.keys.left) player.angle += state.turnSpeed;
         if (state.keys.right) player.angle -= state.turnSpeed;
         
         let moveX = 0, moveZ = 0;
-        if (state.keys.forward) { moveX -= Math.sin(player.angle) * state.moveSpeed; moveZ -= Math.cos(player.angle) * state.moveSpeed; }
-        if (state.keys.backward) { moveX += Math.sin(player.angle) * state.moveSpeed; moveZ += Math.cos(player.angle) * state.moveSpeed; }
+        
+        // Movement: Uses delta for consistent speed (1.5 walls/sec)
+        if (state.keys.forward) { 
+            moveX -= Math.sin(player.angle) * state.moveSpeed * delta; 
+            moveZ -= Math.cos(player.angle) * state.moveSpeed * delta; 
+        }
+        if (state.keys.backward) { 
+            moveX += Math.sin(player.angle) * state.moveSpeed * delta; 
+            moveZ += Math.cos(player.angle) * state.moveSpeed * delta; 
+        }
         
         if (!checkCollision(player.x + moveX, player.z)) player.x += moveX;
         if (!checkCollision(player.x, player.z + moveZ)) player.z += moveZ;
         
         if (moveX !== 0 || moveZ !== 0) {
-            state.distance += state.moveSpeed * 10;
+            state.distance += Math.sqrt(moveX*moveX + moveZ*moveZ);
             distanceCounter.textContent = Math.floor(state.distance);
         }
         
         updateCamera();
-        checkWin();
+        // checkWin(); // Removed: Game never ends
     }
 
     function animate() {
         if (!renderer) return;
         requestAnimationFrame(animate);
-        const time = clock.getElapsedTime();
+        
+        let delta = clock.getDelta();
+        // Safety cap: Prevents teleporting if tab is inactive
+        if (delta > 0.1) delta = 0.1; 
+        
+        const time = performance.now() * 0.001;
         
         if (state.isPlaying) {
-            movePlayer();
-            // Flicker light for creepiness
+            movePlayer(delta);
             playerLight.intensity = 1.5 + Math.sin(time * 10) * 0.1 + Math.sin(time * 23) * 0.05;
         }
         renderer.render(scene, camera);
