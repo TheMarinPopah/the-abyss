@@ -161,11 +161,17 @@ body {
     color: #e8e8e8;
     padding: 0.8rem;
     font-family: 'Special Elite', monospace;
-    font-size: 1.5rem; /* Larger for code entry */
+    font-size: 1.5rem;
     text-align: center;
     letter-spacing: 0.2em;
 }
 .text-input:focus { outline: none; border-color: #e8e8e8; }
+
+.error-msg {
+    color: #8c4a4a;
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+}
 
 #host-info {
     margin-top: 0.5rem;
@@ -185,8 +191,8 @@ body {
 }
 .code-hint { font-size: 0.7rem; color: #444; margin-top: 0.5rem; }
 
-/* Guide & Join Screen */
-#guide-screen, #join-screen { background: #050505; justify-content: center; align-items: center; }
+/* Guide, Join & Waiting Screen */
+#guide-screen, #join-screen, #waiting-screen { background: #050505; justify-content: center; align-items: center; }
 .guide-container { text-align: center; padding: 2rem; max-width: 500px; }
 .guide-title { font-family: 'Creepster', cursive; font-size: 3rem; color: #e8e8e8; margin-bottom: 2rem; }
 .controls-list { display: flex; flex-direction: column; gap: 1.2rem; margin-bottom: 2rem; }
@@ -194,6 +200,22 @@ body {
 .key { display: inline-block; background: #1a1a1a; border: 1px solid #3a3a3a; padding: 0.4rem 0.8rem; color: #b0b0b0; min-width: 40px; }
 .control-desc { color: #5a5a5a; font-size: 0.9rem; }
 .guide-hint { color: #4a4a4a; font-size: 0.85rem; margin-bottom: 2rem; font-style: italic; }
+
+/* Loader Animation */
+.loader {
+    border: 4px solid #1a1a1a;
+    border-top: 4px solid #e8e8e8;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
 /* Game */
 #game-screen { background: #000; }
