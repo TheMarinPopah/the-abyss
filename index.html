@@ -7,34 +7,59 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- MENU SCREEN -->
     <div id="menu-screen" class="screen active">
         <div class="menu-container">
             <h1 class="game-title">THE ABYSS</h1>
             <p class="subtitle">Survive the dark together.</p>
             
-            <div class="menu-buttons">
-                <button id="start-btn" class="btn btn-primary">SINGLE PLAYER</button>
-                
+            <!-- MODE SLIDER -->
+            <div class="mode-slider-container">
+                <div class="slider-labels">
+                    <span id="label-single" class="slider-label active">SINGLE PLAYER</span>
+                    <span id="label-multi" class="slider-label">MULTIPLAYER</span>
+                </div>
+                <div class="slider-track">
+                    <div id="slider-thumb" class="slider-thumb"></div>
+                </div>
+            </div>
+
+            <!-- SINGLE PLAYER BUTTONS -->
+            <div id="single-player-controls" class="menu-buttons active">
+                <button id="start-btn" class="btn btn-primary">START</button>
+                <button id="guide-btn" class="btn btn-secondary">GUIDE</button>
+            </div>
+
+            <!-- MULTIPLAYER BUTTONS -->
+            <div id="multiplayer-controls" class="menu-buttons">
                 <div class="multiplayer-section">
                     <button id="host-btn" class="btn btn-secondary">HOST GAME</button>
                     <div id="host-info" style="display:none;">
                         <p class="code-label">YOUR GAME CODE:</p>
                         <p id="host-code" class="code-display">LOADING...</p>
-                        <p class="code-hint">Share this code with friends.</p>
+                        <p class="code-hint">Share this code with friends. Waiting for them to join...</p>
                     </div>
                 </div>
-
-                <div class="multiplayer-section">
-                    <input type="text" id="join-code-input" class="text-input" placeholder="ENTER HOST CODE">
-                    <button id="join-btn" class="btn btn-secondary">JOIN GAME</button>
-                </div>
-
-                <button id="guide-btn" class="btn btn-secondary">GUIDE</button>
+                <button id="join-menu-btn" class="btn btn-secondary">JOIN GAME</button>
             </div>
         </div>
         <div class="fog-overlay"></div>
     </div>
 
+    <!-- JOIN SCREEN (New Screen) -->
+    <div id="join-screen" class="screen">
+        <div class="guide-container">
+            <h2 class="guide-title">JOIN GAME</h2>
+            <p class="guide-hint">Enter the 6-digit code provided by your friend.</p>
+            <div class="multiplayer-section" style="margin-top: 2rem;">
+                <input type="text" id="join-code-input" class="text-input" placeholder="ENTER CODE" maxlength="6">
+                <button id="join-btn" class="btn btn-primary" style="margin-top: 1rem;">CONNECT</button>
+            </div>
+            <button id="back-from-join-btn" class="btn btn-secondary" style="margin-top: 2rem;">BACK</button>
+        </div>
+    </div>
+
+    <!-- GUIDE SCREEN -->
     <div id="guide-screen" class="screen">
         <div class="guide-container">
             <h2 class="guide-title">CONTROLS</h2>
@@ -56,11 +81,11 @@
                     <span class="control-desc">Turn Right</span>
                 </div>
             </div>
-            <p class="guide-hint">Host a game to get a code, or join a friend's game.</p>
             <button id="back-btn" class="btn btn-secondary">BACK</button>
         </div>
     </div>
 
+    <!-- GAME SCREEN -->
     <div id="game-screen" class="screen">
         <div id="game-container"></div>
         <div class="hud">
@@ -73,6 +98,7 @@
         <div class="scanlines"></div>
     </div>
 
+    <!-- WIN SCREEN -->
     <div id="win-screen" class="screen">
         <div class="win-container">
             <h2 class="win-title">ESCAPED</h2>
