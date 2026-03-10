@@ -39,16 +39,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const guideScreen = document.getElementById('guide-screen');
     const gameScreen = document.getElementById('game-screen');
     const winScreen = document.getElementById('win-screen');
-    const joinScreen = document.getElementById('join-screen'); // New
+    const joinScreen = document.getElementById('join-screen');
 
     // Buttons
     const startBtn = document.getElementById('start-btn');
     const hostBtn = document.getElementById('host-btn');
-    const joinMenuBtn = document.getElementById('join-menu-btn'); // New
+    const hostStartBtn = document.getElementById('host-start-btn'); // New Button
+    const joinMenuBtn = document.getElementById('join-menu-btn');
     const joinBtn = document.getElementById('join-btn');
     const guideBtn = document.getElementById('guide-btn');
     const backBtn = document.getElementById('back-btn');
-    const backFromJoinBtn = document.getElementById('back-from-join-btn'); // New
+    const backFromJoinBtn = document.getElementById('back-from-join-btn');
     const restartBtn = document.getElementById('restart-btn');
     
     // UI Elements
@@ -57,6 +58,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const hostCodeDisplay = document.getElementById('host-code');
     const hostInfoDiv = document.getElementById('host-info');
     const joinInput = document.getElementById('join-code-input');
+    const joinStatus = document.getElementById('join-status'); // Status text
 
     // Slider Elements
     const sliderThumb = document.getElementById('slider-thumb');
@@ -249,13 +251,11 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if (isHost) {
                 connections.push(conn);
-                // Send maze to the new player
+                // Send maze to the new player immediately, but DO NOT start yet
                 conn.send({ type: 'maze', data: maze });
-                // Host starts the game immediately when someone joins
-                startGame();
             } else {
                 myConn = conn;
-                // Joiner waits for maze data (handled in handleData)
+                // Joiner waits for data
             }
         });
 
@@ -278,7 +278,12 @@ window.addEventListener('DOMContentLoaded', () => {
         if (data.type === 'maze') {
             // Joiner receives maze
             maze = data.data;
-            // Joiner starts game now
+            // Show "Waiting" status
+            joinStatus.style.display = 'block';
+            joinStatus.textContent = "Connected! Waiting for host to start...";
+        }
+        else if (data.type === 'start') {
+            // Joiner receives start signal
             startGame();
         }
         else if (data.type === 'move') {
@@ -347,7 +352,6 @@ window.addEventListener('DOMContentLoaded', () => {
         
         createFloor();
         
-        // Safety check: generate maze if missing (shouldn't happen with fixed logic)
         if (maze.length === 0) {
             maze = generateMaze(state.mazeSize, state.mazeSize);
         }
@@ -534,7 +538,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Single Player Start
     startBtn.addEventListener('click', () => {
         isHost = false;
-        maze = []; // Clear maze to generate fresh
+        maze = []; 
         startGame();
     });
 
@@ -543,12 +547,18 @@ window.addEventListener('DOMContentLoaded', () => {
         initNetworking(true);
     });
 
-    // Join Menu Button (opens Join Screen)
+    // Host Start Button (Trigger for everyone)
+    hostStartBtn.addEventListener('click', () => {
+        startGame(); // Start for host
+        broadcastData({ type: 'start' }); // Tell everyone else to start
+    });
+
+    // Join Menu Button
     joinMenuBtn.addEventListener('click', () => {
         showScreen('join');
     });
 
-    // Join Confirm Button (on Join Screen)
+    // Join Confirm Button
     joinBtn.addEventListener('click', () => {
         const hostCode = joinInput.value.trim();
         if (!hostCode) {
