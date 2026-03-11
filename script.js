@@ -1,3 +1,11 @@
+The issue you are describing (working locally but failing between different computers/networks) is almost always caused by **NAT Traversal** issues (Firewalls/Routers blocking the connection). PeerJS uses WebRTC, which sometimes needs specific "ICE Servers" to punch through routers.
+
+I will update the configuration to use the most robust settings possible for cross-network play, including redundant STUN servers (to help establish the connection) and `serialization: 'json'` which is more stable for some networks.
+
+### script.js
+I have updated the `peerOptions` in both `initNetworking` (Host) and the Join logic (Player 2).
+
+```javascript
 window.addEventListener('DOMContentLoaded', () => {
 
     // --- Safety Check ---
@@ -19,7 +27,6 @@ window.addEventListener('DOMContentLoaded', () => {
     };
 
     // Player Colors (Max 8 Players)
-    // 0: White (Host), 1: Red, 2: Green, 3: Blue, 4: Yellow, 5: Cyan, 6: Magenta, 7: Orange
     const playerColors = [
         0xffffff, 0xff4444, 0x44ff44, 0x4444ff, 
         0xffff44, 0x44ffff, 0xff44ff, 0xff8844
@@ -40,7 +47,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let isHost = false;
     let otherPlayers = {}; 
     let myId = null;
-    let myColorIndex = 0; // Host is always 0
+    let myColorIndex = 0;
 
     // DOM Elements
     const menuScreen = document.getElementById('menu-screen');
@@ -113,7 +120,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Create Cute Character Mesh ---
-    // Now accepts a colorHex value
     function createCharacterMesh(colorHex = 0xffffff) {
         const group = new THREE.Group();
         
@@ -225,18 +231,28 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        // FIX: Robust configuration for cross-network connections
+        // Added serialization: 'json' for better network compatibility
         const peerOptions = {
-            debug: 2,
-            host: '0.peerjs.com',
-            port: 443,
-            secure: true
+            debug: 2, 
+            secure: true,
+            serialization: 'json',
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
         };
 
         if (hosting) {
             const roomCode = generateRoomCode();
             peer = new Peer(roomCode, peerOptions);
             isHost = true;
-            myColorIndex = 0; // Host is always color 0
+            myColorIndex = 0; 
             
             peer.on('open', (id) => {
                 myId = id;
@@ -252,7 +268,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     lobbyCodeDisplay.textContent = "RETRY...";
                     initNetworking(true);
                 } else if (err.type === 'network') {
-                    alert('Network Error: Could not reach the server.');
+                    alert('Network Error: Could not reach the server. Check connection/firewall.');
                     showScreen('menu');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
@@ -261,7 +277,6 @@ window.addEventListener('DOMContentLoaded', () => {
             });
             
             peer.on('connection', (conn) => {
-                // Limit to 8 players (Host + 7 connections)
                 if (connections.length >= 7) {
                     console.log("Player rejected: Server full.");
                     conn.on('open', () => {
@@ -282,15 +297,10 @@ window.addEventListener('DOMContentLoaded', () => {
             if (isHost) {
                 connections.push(conn);
                 
-                // 1. Determine color for this new player
-                const colorIndex = connections.length; // 1, 2, 3...
+                const colorIndex = connections.length;
                 
-                // 2. Send initialization data to the new player
-                // Includes: Maze, their assigned color, and current player list
                 const currentPlayers = {};
-                // Add host to list
                 currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 };
-                // Add other connected players
                 for (let id in otherPlayers) {
                     currentPlayers[id] = otherPlayers[id];
                 }
@@ -298,12 +308,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 conn.send({ 
                     type: 'init', 
                     data: maze, 
-                    yourId: myId, // sending host id for reference
+                    yourId: myId,
                     yourColorIndex: colorIndex,
                     players: currentPlayers
                 });
 
-                // 3. Tell everyone ELSE that a new player joined
                 broadcastData({ 
                     type: 'new-player', 
                     id: conn.peer, 
@@ -324,7 +333,6 @@ window.addEventListener('DOMContentLoaded', () => {
             if (isHost) {
                 connections = connections.filter(c => c.peer !== conn.peer);
                 removeOtherPlayer(conn.peer);
-                // Notify everyone else that this player left
                 broadcastData({ type: 'player-left', id: conn.peer });
             } else {
                 alert("Host disconnected.");
@@ -332,9 +340,10 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        conn.on('error', () => {
+        conn.on('error', (err) => {
+            console.error("Connection error:", err);
             if (!isHost) {
-                joinError.textContent = "Connection failed.";
+                joinError.textContent = "Connection failed (Firewall/Network issue).";
                 joinError.style.display = 'block';
                 showScreen('join');
             }
@@ -343,20 +352,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function handleData(data, senderId) {
         if (data.type === 'init') {
-            // Received by JOINER only
             maze = data.data;
             myColorIndex = data.yourColorIndex;
             
-            // Spawn existing players
             for (let id in data.players) {
                 let p = data.players[id];
                 updateOtherPlayer(id, p.x, p.z, p.angle, p.colorIndex);
             }
         }
         else if (data.type === 'new-player') {
-            // Received by EVERYONE ELSE when someone joins
-            // We don't have their pos yet, but we know they exist. 
-            // They will send 'move' shortly. We pre-register them.
             if (!otherPlayers[senderId]) {
                 otherPlayers[senderId] = { colorIndex: data.colorIndex };
             }
@@ -368,12 +372,9 @@ window.addEventListener('DOMContentLoaded', () => {
             startGame();
         }
         else if (data.type === 'move') {
-            // Host relays moves, joiners just process them
-            // Data contains: id, x, z, angle, colorIndex (usually from host)
             updateOtherPlayer(data.id, data.x, data.z, data.angle, data.colorIndex);
             
             if (isHost) {
-                // Broadcast to everyone else
                 broadcastData(data, senderId);
             }
         }
@@ -385,7 +386,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function sendData(data) {
-        // Add my color index to my movement data so others know what color I am
         data.colorIndex = myColorIndex;
         if (myConn && myConn.open) myConn.send(data);
     }
@@ -402,7 +402,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (id === myId) return; 
 
         if (!otherPlayers[id]) {
-            // Determine color: use provided index, or default to 1 if unknown
             const cIdx = (colorIndex !== undefined) ? colorIndex : 1;
             const colorHex = playerColors[cIdx] || playerColors[1];
             
@@ -458,7 +457,6 @@ window.addEventListener('DOMContentLoaded', () => {
         createWalls();
         createDustParticles();
         
-        // Create Self (use assigned color index)
         playerMesh = createCharacterMesh(playerColors[myColorIndex]);
         scene.add(playerMesh);
         
@@ -581,9 +579,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         updateCamera();
 
-        // Multiplayer Movement Sync
         if (isHost) {
-            // Host broadcasts their movement with their ID and Color
             broadcastData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle, colorIndex: myColorIndex });
         } else if (myConn && myConn.open) {
             sendData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle });
@@ -641,7 +637,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- Event Listeners ---
 
-    // Single Player Start
     startBtn.addEventListener('click', () => {
         isHost = false;
         myColorIndex = 0;
@@ -649,24 +644,20 @@ window.addEventListener('DOMContentLoaded', () => {
         startGame();
     });
 
-    // Host Button
     hostBtn.addEventListener('click', () => {
         initNetworking(true);
     });
 
-    // Lobby Start Button
     lobbyStartBtn.addEventListener('click', () => {
         startGame();
         broadcastData({ type: 'start' });
     });
 
-    // Join Menu Button
     joinMenuBtn.addEventListener('click', () => {
         joinError.style.display = 'none';
         showScreen('join');
     });
 
-    // Join Confirm Button
     joinBtn.addEventListener('click', () => {
         const hostCode = joinInput.value.trim();
         if (!hostCode) {
@@ -685,20 +676,25 @@ window.addEventListener('DOMContentLoaded', () => {
         
         const peerOptions = {
             debug: 2,
-            host: '0.peerjs.com',
-            port: 443,
-            secure: true
+            secure: true,
+            serialization: 'json',
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
         };
         
         peer = new Peer(peerOptions);
         
         peer.on('open', (id) => {
             myId = id;
-            const conn = peer.connect(hostCode);
+            const conn = peer.connect(hostCode); 
             myConn = conn;
             
             conn.on('error', (err) => {
-                joinError.textContent = "INVALID CODE";
+                joinError.textContent = "Connection failed.";
                 joinError.style.display = 'block';
                 showScreen('join');
             });
@@ -709,15 +705,16 @@ window.addEventListener('DOMContentLoaded', () => {
         peer.on('error', (err) => {
             if (err.type === 'peer-unavailable') {
                 joinError.textContent = "INVALID CODE";
+            } else if (err.type === 'network') {
+                joinError.textContent = "NETWORK ERROR (Check Firewall)";
             } else {
-                joinError.textContent = "CONNECTION ERROR";
+                joinError.textContent = "ERROR: " + err.type;
             }
             joinError.style.display = 'block';
             showScreen('join');
         });
     });
     
-    // Back Buttons
     guideBtn.addEventListener('click', () => showScreen('guide'));
     backBtn.addEventListener('click', () => showScreen('menu'));
     backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
@@ -743,7 +740,7 @@ window.addEventListener('DOMContentLoaded', () => {
         connections = [];
         myConn = null;
         maze = [];
-        otherPlayers = {}; // Clear other players
+        otherPlayers = {};
         showScreen('menu');
     });
 
@@ -772,3 +769,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
     showScreen('menu');
 });
+```
