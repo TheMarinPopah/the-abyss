@@ -18,6 +18,13 @@ window.addEventListener('DOMContentLoaded', () => {
         keys: { forward: false, backward: false, left: false, right: false }
     };
 
+    // Player Colors (Max 8 Players)
+    // 0: White (Host), 1: Red, 2: Green, 3: Blue, 4: Yellow, 5: Cyan, 6: Magenta, 7: Orange
+    const playerColors = [
+        0xffffff, 0xff4444, 0x44ff44, 0x4444ff, 
+        0xffff44, 0x44ffff, 0xff44ff, 0xff8844
+    ];
+
     // Three.js variables
     let scene, camera, renderer, clock;
     let player = { x: 1.5 * 4, z: 1.5 * 4, angle: 0 };
@@ -33,6 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let isHost = false;
     let otherPlayers = {}; 
     let myId = null;
+    let myColorIndex = 0; // Host is always 0
 
     // DOM Elements
     const menuScreen = document.getElementById('menu-screen');
@@ -40,25 +48,26 @@ window.addEventListener('DOMContentLoaded', () => {
     const gameScreen = document.getElementById('game-screen');
     const winScreen = document.getElementById('win-screen');
     const joinScreen = document.getElementById('join-screen');
+    const hostScreen = document.getElementById('host-screen');
     const waitingScreen = document.getElementById('waiting-screen');
 
     // Buttons
     const startBtn = document.getElementById('start-btn');
     const hostBtn = document.getElementById('host-btn');
-    const hostStartBtn = document.getElementById('host-start-btn');
+    const lobbyStartBtn = document.getElementById('lobby-start-btn');
     const joinMenuBtn = document.getElementById('join-menu-btn');
     const joinBtn = document.getElementById('join-btn');
     const guideBtn = document.getElementById('guide-btn');
     const backBtn = document.getElementById('back-btn');
     const backFromJoinBtn = document.getElementById('back-from-join-btn');
     const backFromWaitingBtn = document.getElementById('back-from-waiting-btn');
+    const backFromLobbyBtn = document.getElementById('back-from-lobby-btn');
     const restartBtn = document.getElementById('restart-btn');
     
     // UI Elements
     const distanceCounter = document.getElementById('distance-counter');
     const gameContainer = document.getElementById('game-container');
-    const hostCodeDisplay = document.getElementById('host-code');
-    const hostInfoDiv = document.getElementById('host-info');
+    const lobbyCodeDisplay = document.getElementById('lobby-code-display');
     const joinInput = document.getElementById('join-code-input');
     const joinError = document.getElementById('join-error');
 
@@ -104,24 +113,23 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Create Cute Character Mesh ---
-    function createCharacterMesh(color = 0xffffff) {
+    // Now accepts a colorHex value
+    function createCharacterMesh(colorHex = 0xffffff) {
         const group = new THREE.Group();
+        
+        const bodyMat = new THREE.MeshToonMaterial({ 
+            color: colorHex, emissive: colorHex, emissiveIntensity: 0.1
+        });
         
         // Body
         const bodyGeo = new THREE.CapsuleGeometry(0.35, 0.8, 8, 16);
-        const bodyMat = new THREE.MeshToonMaterial({ 
-            color: color, emissive: color, emissiveIntensity: 0.1
-        });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.7;
         group.add(body);
         
         // Head
         const headGeo = new THREE.SphereGeometry(0.4, 16, 16);
-        const headMat = new THREE.MeshToonMaterial({ 
-            color: color, emissive: color, emissiveIntensity: 0.1
-        });
-        const head = new THREE.Mesh(headGeo, headMat);
+        const head = new THREE.Mesh(headGeo, bodyMat);
         head.position.y = 1.55;
         group.add(head);
         
@@ -130,11 +138,11 @@ window.addEventListener('DOMContentLoaded', () => {
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
         
         const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-        leftEye.position.set(-0.12, 1.6, 0.32);
+        leftEye.position.set(-0.12, 1.6, -0.32);
         group.add(leftEye);
         
         const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-        rightEye.position.set(0.12, 1.6, 0.32);
+        rightEye.position.set(0.12, 1.6, -0.32);
         group.add(rightEye);
         
         // Highlights
@@ -142,11 +150,11 @@ window.addEventListener('DOMContentLoaded', () => {
         const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         
         const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-        leftHighlight.position.set(-0.1, 1.63, 0.38);
+        leftHighlight.position.set(-0.1, 1.63, -0.38);
         group.add(leftHighlight);
         
         const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-        rightHighlight.position.set(0.14, 1.63, 0.38);
+        rightHighlight.position.set(0.14, 1.63, -0.38);
         group.add(rightHighlight);
         
         // Arms
@@ -166,13 +174,13 @@ window.addEventListener('DOMContentLoaded', () => {
         const blushMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.4 });
         
         const leftBlush = new THREE.Mesh(blushGeo, blushMat);
-        leftBlush.position.set(-0.25, 1.52, 0.35);
-        leftBlush.lookAt(-0.25, 1.52, 1);
+        leftBlush.position.set(-0.25, 1.52, -0.35);
+        leftBlush.lookAt(-0.25, 1.52, -1);
         group.add(leftBlush);
         
         const rightBlush = new THREE.Mesh(blushGeo, blushMat);
-        rightBlush.position.set(0.25, 1.52, 0.35);
-        rightBlush.lookAt(0.25, 1.52, 1);
+        rightBlush.position.set(0.25, 1.52, -0.35);
+        rightBlush.lookAt(0.25, 1.52, -1);
         group.add(rightBlush);
         
         return group;
@@ -217,7 +225,6 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // FIX: Explicit server configuration to solve Network Errors on HTTPS
         const peerOptions = {
             debug: 2,
             host: '0.peerjs.com',
@@ -229,28 +236,40 @@ window.addEventListener('DOMContentLoaded', () => {
             const roomCode = generateRoomCode();
             peer = new Peer(roomCode, peerOptions);
             isHost = true;
+            myColorIndex = 0; // Host is always color 0
             
             peer.on('open', (id) => {
                 myId = id;
                 console.log('Hosting with code:', id);
-                hostCodeDisplay.textContent = id;
-                hostInfoDiv.style.display = 'block';
+                lobbyCodeDisplay.textContent = id;
+                showScreen('host');
                 maze = generateMaze(state.mazeSize, state.mazeSize);
             });
             
             peer.on('error', (err) => {
                 console.error(err);
                 if (err.type === 'unavailable-id') {
-                    hostCodeDisplay.textContent = "Retrying...";
+                    lobbyCodeDisplay.textContent = "RETRY...";
                     initNetworking(true);
                 } else if (err.type === 'network') {
-                    alert('Network Error: Could not reach the server. Please check your internet connection or disable AdBlockers.');
+                    alert('Network Error: Could not reach the server.');
+                    showScreen('menu');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
+                    showScreen('menu');
                 }
             });
             
             peer.on('connection', (conn) => {
+                // Limit to 8 players (Host + 7 connections)
+                if (connections.length >= 7) {
+                    console.log("Player rejected: Server full.");
+                    conn.on('open', () => {
+                        conn.send({ type: 'error', msg: 'Server is full (8/8 players).' });
+                        setTimeout(() => conn.close(), 500);
+                    });
+                    return;
+                }
                 setupConnection(conn);
             });
         }
@@ -262,7 +281,35 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if (isHost) {
                 connections.push(conn);
-                conn.send({ type: 'maze', data: maze });
+                
+                // 1. Determine color for this new player
+                const colorIndex = connections.length; // 1, 2, 3...
+                
+                // 2. Send initialization data to the new player
+                // Includes: Maze, their assigned color, and current player list
+                const currentPlayers = {};
+                // Add host to list
+                currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 };
+                // Add other connected players
+                for (let id in otherPlayers) {
+                    currentPlayers[id] = otherPlayers[id];
+                }
+
+                conn.send({ 
+                    type: 'init', 
+                    data: maze, 
+                    yourId: myId, // sending host id for reference
+                    yourColorIndex: colorIndex,
+                    players: currentPlayers
+                });
+
+                // 3. Tell everyone ELSE that a new player joined
+                broadcastData({ 
+                    type: 'new-player', 
+                    id: conn.peer, 
+                    colorIndex: colorIndex 
+                }, conn.peer);
+
             } else {
                 myConn = conn;
                 showScreen('waiting');
@@ -277,6 +324,8 @@ window.addEventListener('DOMContentLoaded', () => {
             if (isHost) {
                 connections = connections.filter(c => c.peer !== conn.peer);
                 removeOtherPlayer(conn.peer);
+                // Notify everyone else that this player left
+                broadcastData({ type: 'player-left', id: conn.peer });
             } else {
                 alert("Host disconnected.");
                 location.reload();
@@ -293,21 +342,51 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleData(data, senderId) {
-        if (data.type === 'maze') {
+        if (data.type === 'init') {
+            // Received by JOINER only
             maze = data.data;
+            myColorIndex = data.yourColorIndex;
+            
+            // Spawn existing players
+            for (let id in data.players) {
+                let p = data.players[id];
+                updateOtherPlayer(id, p.x, p.z, p.angle, p.colorIndex);
+            }
+        }
+        else if (data.type === 'new-player') {
+            // Received by EVERYONE ELSE when someone joins
+            // We don't have their pos yet, but we know they exist. 
+            // They will send 'move' shortly. We pre-register them.
+            if (!otherPlayers[senderId]) {
+                otherPlayers[senderId] = { colorIndex: data.colorIndex };
+            }
+        }
+        else if (data.type === 'player-left') {
+            removeOtherPlayer(data.id);
         }
         else if (data.type === 'start') {
             startGame();
         }
         else if (data.type === 'move') {
-            updateOtherPlayer(senderId, data.x, data.z, data.angle);
+            // Host relays moves, joiners just process them
+            // Data contains: id, x, z, angle, colorIndex (usually from host)
+            updateOtherPlayer(data.id, data.x, data.z, data.angle, data.colorIndex);
+            
             if (isHost) {
-                broadcastData({ type: 'move', id: senderId, x: data.x, z: data.z, angle: data.angle }, senderId);
+                // Broadcast to everyone else
+                broadcastData(data, senderId);
             }
+        }
+        else if (data.type === 'error') {
+            alert(data.msg);
+            if(peer) peer.destroy();
+            showScreen('menu');
         }
     }
 
     function sendData(data) {
+        // Add my color index to my movement data so others know what color I am
+        data.colorIndex = myColorIndex;
         if (myConn && myConn.open) myConn.send(data);
     }
 
@@ -319,17 +398,24 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateOtherPlayer(id, x, z, angle) {
+    function updateOtherPlayer(id, x, z, angle, colorIndex) {
         if (id === myId) return; 
 
         if (!otherPlayers[id]) {
-            const mesh = createCharacterMesh(0xffeedd);
+            // Determine color: use provided index, or default to 1 if unknown
+            const cIdx = (colorIndex !== undefined) ? colorIndex : 1;
+            const colorHex = playerColors[cIdx] || playerColors[1];
+            
+            const mesh = createCharacterMesh(colorHex);
             scene.add(mesh);
-            otherPlayers[id] = { mesh, x, z, angle };
+            otherPlayers[id] = { mesh, x, z, angle, colorIndex: cIdx };
         }
 
         otherPlayers[id].mesh.position.set(x, 0, z);
         otherPlayers[id].mesh.rotation.y = angle;
+        otherPlayers[id].x = x;
+        otherPlayers[id].z = z;
+        otherPlayers[id].angle = angle;
     }
 
     function removeOtherPlayer(id) {
@@ -372,7 +458,8 @@ window.addEventListener('DOMContentLoaded', () => {
         createWalls();
         createDustParticles();
         
-        playerMesh = createCharacterMesh(0xffffff);
+        // Create Self (use assigned color index)
+        playerMesh = createCharacterMesh(playerColors[myColorIndex]);
         scene.add(playerMesh);
         
         player.x = 1.5 * state.cellSize;
@@ -494,10 +581,12 @@ window.addEventListener('DOMContentLoaded', () => {
         
         updateCamera();
 
+        // Multiplayer Movement Sync
         if (isHost) {
-            broadcastData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle });
+            // Host broadcasts their movement with their ID and Color
+            broadcastData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle, colorIndex: myColorIndex });
         } else if (myConn && myConn.open) {
-            sendData({ type: 'move', x: player.x, z: player.z, angle: player.angle });
+            sendData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle });
         }
     }
 
@@ -524,6 +613,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameScreen.classList.remove('active');
         winScreen.classList.remove('active');
         joinScreen.classList.remove('active');
+        hostScreen.classList.remove('active');
         waitingScreen.classList.remove('active');
         
         if (name === 'menu') menuScreen.classList.add('active');
@@ -531,6 +621,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (name === 'game') gameScreen.classList.add('active');
         if (name === 'win') winScreen.classList.add('active');
         if (name === 'join') joinScreen.classList.add('active');
+        if (name === 'host') hostScreen.classList.add('active');
         if (name === 'waiting') waitingScreen.classList.add('active');
     }
 
@@ -553,6 +644,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Single Player Start
     startBtn.addEventListener('click', () => {
         isHost = false;
+        myColorIndex = 0;
         maze = []; 
         startGame();
     });
@@ -562,8 +654,8 @@ window.addEventListener('DOMContentLoaded', () => {
         initNetworking(true);
     });
 
-    // Host Start Button
-    hostStartBtn.addEventListener('click', () => {
+    // Lobby Start Button
+    lobbyStartBtn.addEventListener('click', () => {
         startGame();
         broadcastData({ type: 'start' });
     });
@@ -591,7 +683,6 @@ window.addEventListener('DOMContentLoaded', () => {
         isHost = false;
         joinError.style.display = 'none';
         
-        // FIX: Use same explicit configuration
         const peerOptions = {
             debug: 2,
             host: '0.peerjs.com',
@@ -631,6 +722,13 @@ window.addEventListener('DOMContentLoaded', () => {
     backBtn.addEventListener('click', () => showScreen('menu'));
     backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
     
+    backFromLobbyBtn.addEventListener('click', () => {
+        if(peer) peer.destroy();
+        peer = null;
+        isHost = false;
+        showScreen('menu');
+    });
+
     backFromWaitingBtn.addEventListener('click', () => {
         if(peer) peer.destroy();
         peer = null;
@@ -645,6 +743,7 @@ window.addEventListener('DOMContentLoaded', () => {
         connections = [];
         myConn = null;
         maze = [];
+        otherPlayers = {}; // Clear other players
         showScreen('menu');
     });
 
