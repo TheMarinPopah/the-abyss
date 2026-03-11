@@ -32,19 +32,29 @@
 
             <!-- MULTIPLAYER BUTTONS -->
             <div id="multiplayer-controls" class="menu-buttons">
-                <div class="multiplayer-section">
-                    <button id="host-btn" class="btn btn-secondary">HOST GAME</button>
-                    <div id="host-info" style="display:none;">
-                        <p class="code-label">YOUR GAME CODE:</p>
-                        <p id="host-code" class="code-display">LOADING...</p>
-                        <p class="code-hint">Share this code with friends. Click START when ready.</p>
-                        <button id="host-start-btn" class="btn btn-primary" style="margin-top: 1rem;">START GAME</button>
-                    </div>
-                </div>
+                <button id="host-btn" class="btn btn-secondary">HOST GAME</button>
                 <button id="join-menu-btn" class="btn btn-secondary">JOIN GAME</button>
             </div>
         </div>
         <div class="fog-overlay"></div>
+    </div>
+
+    <!-- HOST SCREEN (New Layout) -->
+    <div id="host-screen" class="screen">
+        <div class="host-lobby-container">
+            <!-- The Top Bar -->
+            <div class="lobby-bar">
+                <h1 class="lobby-title">THE ABYSS</h1>
+                <div class="lobby-code-area">
+                    <span class="code-label">CODE</span>
+                    <span id="lobby-code-display" class="code-display">------</span>
+                </div>
+                <button id="lobby-start-btn" class="btn btn-primary">START GAME</button>
+            </div>
+            
+            <p class="lobby-hint">Waiting for friends to join...</p>
+            <button id="back-from-lobby-btn" class="btn btn-secondary" style="margin-top: 2rem;">CANCEL</button>
+        </div>
     </div>
 
     <!-- JOIN SCREEN -->
@@ -54,7 +64,6 @@
             <p class="guide-hint">Enter the 6-digit code provided by your friend.</p>
             <div class="multiplayer-section" style="margin-top: 2rem;">
                 <input type="text" id="join-code-input" class="text-input" placeholder="ENTER CODE" maxlength="6">
-                <!-- Error Message Container -->
                 <p id="join-error" class="error-msg" style="display: none; margin-top: 0.5rem;">INVALID CODE</p>
                 <button id="join-btn" class="btn btn-primary" style="margin-top: 1rem;">CONNECT</button>
             </div>
@@ -62,7 +71,7 @@
         </div>
     </div>
 
-    <!-- WAITING SCREEN (New) -->
+    <!-- WAITING SCREEN -->
     <div id="waiting-screen" class="screen">
         <div class="guide-container">
             <h2 class="guide-title" style="color: #4a8c4a;">CONNECTED</h2>
