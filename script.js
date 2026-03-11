@@ -1,11 +1,3 @@
-The issue you are describing (working locally but failing between different computers/networks) is almost always caused by **NAT Traversal** issues (Firewalls/Routers blocking the connection). PeerJS uses WebRTC, which sometimes needs specific "ICE Servers" to punch through routers.
-
-I will update the configuration to use the most robust settings possible for cross-network play, including redundant STUN servers (to help establish the connection) and `serialization: 'json'` which is more stable for some networks.
-
-### script.js
-I have updated the `peerOptions` in both `initNetworking` (Host) and the Join logic (Player 2).
-
-```javascript
 window.addEventListener('DOMContentLoaded', () => {
 
     // --- Safety Check ---
@@ -232,11 +224,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         // FIX: Robust configuration for cross-network connections
-        // Added serialization: 'json' for better network compatibility
         const peerOptions = {
             debug: 2, 
             secure: true,
-            serialization: 'json',
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -268,7 +258,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     lobbyCodeDisplay.textContent = "RETRY...";
                     initNetworking(true);
                 } else if (err.type === 'network') {
-                    alert('Network Error: Could not reach the server. Check connection/firewall.');
+                    alert('Network Error: Could not reach the server. Check connection.');
                     showScreen('menu');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
@@ -343,7 +333,7 @@ window.addEventListener('DOMContentLoaded', () => {
         conn.on('error', (err) => {
             console.error("Connection error:", err);
             if (!isHost) {
-                joinError.textContent = "Connection failed (Firewall/Network issue).";
+                joinError.textContent = "Connection failed.";
                 joinError.style.display = 'block';
                 showScreen('join');
             }
@@ -677,7 +667,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const peerOptions = {
             debug: 2,
             secure: true,
-            serialization: 'json',
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -690,11 +679,11 @@ window.addEventListener('DOMContentLoaded', () => {
         
         peer.on('open', (id) => {
             myId = id;
-            const conn = peer.connect(hostCode); 
+            const conn = peer.connect(hostCode, { reliable: true }); // Reliable for game data
             myConn = conn;
             
             conn.on('error', (err) => {
-                joinError.textContent = "Connection failed.";
+                joinError.textContent = "INVALID CODE";
                 joinError.style.display = 'block';
                 showScreen('join');
             });
@@ -705,10 +694,8 @@ window.addEventListener('DOMContentLoaded', () => {
         peer.on('error', (err) => {
             if (err.type === 'peer-unavailable') {
                 joinError.textContent = "INVALID CODE";
-            } else if (err.type === 'network') {
-                joinError.textContent = "NETWORK ERROR (Check Firewall)";
             } else {
-                joinError.textContent = "ERROR: " + err.type;
+                joinError.textContent = "CONNECTION ERROR";
             }
             joinError.style.display = 'block';
             showScreen('join');
@@ -769,4 +756,3 @@ window.addEventListener('DOMContentLoaded', () => {
 
     showScreen('menu');
 });
-```
