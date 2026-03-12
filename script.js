@@ -18,10 +18,16 @@ window.addEventListener('DOMContentLoaded', () => {
         keys: { forward: false, backward: false, left: false, right: false }
     };
 
-    // Player Colors (Max 8 Players)
+    // Player Colors (Hazmat Suit Colors)
     const playerColors = [
-        0xffffff, 0xff4444, 0x44ff44, 0x4444ff, 
-        0xffff44, 0x44ffff, 0xff44ff, 0xff8844
+        0xF4D03F, // Default Yellow
+        0xE74C3C, // Red
+        0x2ECC71, // Green
+        0x3498DB, // Blue
+        0xE67E22, // Orange
+        0x9B59B6, // Purple
+        0x1ABC9C, // Teal
+        0xE91E63  // Pink
     ];
 
     // Three.js variables
@@ -111,76 +117,142 @@ window.addEventListener('DOMContentLoaded', () => {
         return String(Math.floor(100000 + Math.random() * 900000));
     }
 
-    // --- Create Cute Character Mesh ---
-    function createCharacterMesh(colorHex = 0xffffff) {
+    // --- Procedural Texture Generator ---
+    function createNoiseTexture(baseColor, noiseAmount, size = 64) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Base
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, size, size);
+        
+        // Noise
+        const imageData = ctx.getImageData(0, 0, size, size);
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            const noise = (Math.random() - 0.5) * noiseAmount;
+            imageData.data[i] += noise;
+            imageData.data[i+1] += noise;
+            imageData.data[i+2] += noise;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        return texture;
+    }
+
+    // --- Create Hazmat Character Mesh ---
+    function createCharacterMesh(colorHex = 0xF4D03F) {
         const group = new THREE.Group();
         
-        const bodyMat = new THREE.MeshToonMaterial({ 
-            color: colorHex, emissive: colorHex, emissiveIntensity: 0.1
+        // Materials
+        const suitMat = new THREE.MeshStandardMaterial({ 
+            color: colorHex, roughness: 0.7
         });
+        const visorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x222222, roughness: 0.1, metalness: 0.8
+        });
+        const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        const symbolMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        // Body (Torso)
+        const torsoGeo = new THREE.BoxGeometry(0.6, 0.8, 0.35);
+        const torso = new THREE.Mesh(torsoGeo, suitMat);
+        torso.position.y = 1.0;
+        group.add(torso);
+
+        // Atomic Symbol (Chest)
+        // Draw symbol on canvas texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 64; canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        // Circle
+        ctx.beginPath();
+        ctx.arc(32, 32, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        // Nucleus
+        ctx.beginPath();
+        ctx.arc(32, 32, 5, 0, Math.PI * 2);
+        ctx.fill();
+        // Orbits
+        ctx.beginPath(); ctx.ellipse(32, 32, 10, 25, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(32, 32, 10, 25, Math.PI/3, 0, Math.PI * 2); ctx.stroke();
         
-        // Body
-        const bodyGeo = new THREE.CapsuleGeometry(0.35, 0.8, 8, 16);
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0.7;
-        group.add(body);
+        const symbolTexture = new THREE.CanvasTexture(canvas);
+        const symbolMatText = new THREE.MeshBasicMaterial({ map: symbolTexture, transparent: true });
         
-        // Head
-        const headGeo = new THREE.SphereGeometry(0.4, 16, 16);
-        const head = new THREE.Mesh(headGeo, bodyMat);
-        head.position.y = 1.55;
-        group.add(head);
+        const symbolGeo = new THREE.PlaneGeometry(0.3, 0.3);
+        const symbol = new THREE.Mesh(symbolGeo, symbolMatText);
+        symbol.position.set(0, 1.1, 0.18); // On chest
+        group.add(symbol);
+
+        // Legs
+        const legGeo = new THREE.CapsuleGeometry(0.15, 0.5, 4, 8);
+        const leftLeg = new THREE.Mesh(legGeo, suitMat);
+        leftLeg.position.set(-0.15, 0.4, 0);
+        group.add(leftLeg);
         
-        // Eyes
-        const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+        const rightLeg = new THREE.Mesh(legGeo, suitMat);
+        rightLeg.position.set(0.15, 0.4, 0);
+        group.add(rightLeg);
+
+        // Boots
+        const bootGeo = new THREE.BoxGeometry(0.18, 0.15, 0.25);
+        const leftBoot = new THREE.Mesh(bootGeo, blackMat);
+        leftBoot.position.set(-0.15, 0.07, 0.03);
+        group.add(leftBoot);
         
-        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-        leftEye.position.set(-0.12, 1.6, -0.32);
-        group.add(leftEye);
-        
-        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-        rightEye.position.set(0.12, 1.6, -0.32);
-        group.add(rightEye);
-        
-        // Highlights
-        const highlightGeo = new THREE.SphereGeometry(0.03, 6, 6);
-        const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        
-        const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-        leftHighlight.position.set(-0.1, 1.63, -0.38);
-        group.add(leftHighlight);
-        
-        const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-        rightHighlight.position.set(0.14, 1.63, -0.38);
-        group.add(rightHighlight);
-        
+        const rightBoot = new THREE.Mesh(bootGeo, blackMat);
+        rightBoot.position.set(0.15, 0.07, 0.03);
+        group.add(rightBoot);
+
+        // Head (Helmet)
+        const helmetGeo = new THREE.SphereGeometry(0.3, 16, 16);
+        const helmet = new THREE.Mesh(helmetGeo, suitMat);
+        helmet.position.y = 1.65;
+        helmet.scale.set(1, 1.1, 1);
+        group.add(helmet);
+
+        // Visor
+        const visorGeo = new THREE.SphereGeometry(0.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const visor = new THREE.Mesh(visorGeo, visorMat);
+        visor.position.set(0, 1.65, 0.05);
+        visor.rotation.x = Math.PI / 2;
+        visor.scale.set(0.8, 1, 1);
+        group.add(visor);
+
         // Arms
         const armGeo = new THREE.CapsuleGeometry(0.1, 0.4, 4, 8);
-        const leftArm = new THREE.Mesh(armGeo, bodyMat);
-        leftArm.position.set(-0.5, 0.9, 0);
-        leftArm.rotation.z = 0.3;
+        const leftArm = new THREE.Mesh(armGeo, suitMat);
+        leftArm.position.set(-0.4, 1.0, 0);
+        leftArm.rotation.z = 0.2;
         group.add(leftArm);
         
-        const rightArm = new THREE.Mesh(armGeo, bodyMat);
-        rightArm.position.set(0.5, 0.9, 0);
-        rightArm.rotation.z = -0.3;
+        const rightArm = new THREE.Mesh(armGeo, suitMat);
+        rightArm.position.set(0.4, 1.0, 0);
+        rightArm.rotation.z = -0.2;
         group.add(rightArm);
+
+        // Gloves
+        const gloveGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const leftGlove = new THREE.Mesh(gloveGeo, blackMat);
+        leftGlove.position.set(-0.45, 0.7, 0);
+        group.add(leftGlove);
         
-        // Blush
-        const blushGeo = new THREE.CircleGeometry(0.06, 8);
-        const blushMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.4 });
-        
-        const leftBlush = new THREE.Mesh(blushGeo, blushMat);
-        leftBlush.position.set(-0.25, 1.52, -0.35);
-        leftBlush.lookAt(-0.25, 1.52, -1);
-        group.add(leftBlush);
-        
-        const rightBlush = new THREE.Mesh(blushGeo, blushMat);
-        rightBlush.position.set(0.25, 1.52, -0.35);
-        rightBlush.lookAt(0.25, 1.52, -1);
-        group.add(rightBlush);
-        
+        const rightGlove = new THREE.Mesh(gloveGeo, blackMat);
+        rightGlove.position.set(0.45, 0.7, 0);
+        group.add(rightGlove);
+
+        // Breathing Apparatus (back tank)
+        const tankGeo = new THREE.CapsuleGeometry(0.15, 0.3, 4, 8);
+        const tank = new THREE.Mesh(tankGeo, suitMat);
+        tank.position.set(0, 1.1, -0.25);
+        group.add(tank);
+
         return group;
     }
 
@@ -223,10 +295,10 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // FIX: Robust configuration for cross-network connections
         const peerOptions = {
             debug: 2, 
             secure: true,
+            serialization: 'json',
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -258,7 +330,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     lobbyCodeDisplay.textContent = "RETRY...";
                     initNetworking(true);
                 } else if (err.type === 'network') {
-                    alert('Network Error: Could not reach the server. Check connection.');
+                    alert('Network Error: Could not reach the server. Check connection/firewall.');
                     showScreen('menu');
                 } else {
                     alert('Multiplayer Error: ' + err.type);
@@ -333,7 +405,7 @@ window.addEventListener('DOMContentLoaded', () => {
         conn.on('error', (err) => {
             console.error("Connection error:", err);
             if (!isHost) {
-                joinError.textContent = "Connection failed.";
+                joinError.textContent = "Connection failed (Firewall/Network issue).";
                 joinError.style.display = 'block';
                 showScreen('join');
             }
@@ -418,8 +490,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function initThree() {
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
-        scene.fog = new THREE.Fog(0x000000, 1, 20);
+        scene.background = new THREE.Color(0x807040); // Haze yellow background
+        scene.fog = new THREE.Fog(0x807040, 1, 25);   // Fog matches walls
         
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.y = 1.5;
@@ -431,10 +503,11 @@ window.addEventListener('DOMContentLoaded', () => {
         
         clock = new THREE.Clock();
         
-        const ambientLight = new THREE.AmbientLight(0x333333, 0.3); 
+        // Lighting: Brighter ambient, point light for "flashlight" effect
+        const ambientLight = new THREE.AmbientLight(0x908060, 0.6); 
         scene.add(ambientLight);
         
-        playerLight = new THREE.PointLight(0xffffff, 1.5, 15); 
+        playerLight = new THREE.PointLight(0xffffff, 0.8, 20); 
         playerLight.castShadow = true;
         scene.add(playerLight);
         
@@ -445,7 +518,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         createWalls();
-        createDustParticles();
         
         playerMesh = createCharacterMesh(playerColors[myColorIndex]);
         scene.add(playerMesh);
@@ -459,13 +531,22 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function createFloor() {
+        // Carpet Texture
+        const carpetTexture = createNoiseTexture('#6B5344', 30, 128);
+        carpetTexture.repeat.set(20, 20);
+        
         const floorGeo = new THREE.PlaneGeometry(200, 200);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9 });
+        const floorMat = new THREE.MeshStandardMaterial({ map: carpetTexture, roughness: 0.9 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
         
-        const ceiling = floor.clone();
+        // Ceiling Texture
+        const ceilTexture = createNoiseTexture('#E0D8C0', 10, 128);
+        ceilTexture.repeat.set(20, 20);
+        
+        const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: ceilTexture, side: THREE.BackSide }));
+        ceiling.rotation.x = Math.PI / 2;
         ceiling.position.y = state.wallHeight;
         scene.add(ceiling);
     }
@@ -475,41 +556,24 @@ window.addEventListener('DOMContentLoaded', () => {
         walls = [];
         const wallGeo = new THREE.BoxGeometry(state.cellSize, state.wallHeight, state.cellSize);
         
+        // Wall Texture (Yellow Wallpaper)
+        const wallTexture = createNoiseTexture('#C8B870', 15, 64);
+        wallTexture.repeat.set(1, 1);
+
+        const wallMat = new THREE.MeshStandardMaterial({ 
+            map: wallTexture, roughness: 0.8
+        });
+        
         for (let y = 0; y < state.mazeSize; y++) {
             for (let x = 0; x < state.mazeSize; x++) {
                 if (maze[y][x] === 1) {
-                    const wallMat = new THREE.MeshStandardMaterial({ 
-                        color: 0x111111, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.8
-                    });
-                    
                     const wall = new THREE.Mesh(wallGeo, wallMat);
                     wall.position.set(x * state.cellSize + state.cellSize/2, state.wallHeight/2, y * state.cellSize + state.cellSize/2);
                     scene.add(wall);
                     walls.push(wall);
-                    
-                    const edges = new THREE.EdgesGeometry(wallGeo);
-                    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-                    const line = new THREE.LineSegments(edges, lineMat);
-                    line.position.copy(wall.position);
-                    scene.add(line);
-                    walls.push(line);
                 }
             }
         }
-    }
-
-    function createDustParticles() {
-        const particleCount = 200;
-        const positions = new Float32Array(particleCount * 3);
-        for (let i = 0; i < particleCount; i++) {
-            positions[i*3] = (Math.random() - 0.5) * state.mazeSize * state.cellSize;
-            positions[i*3+1] = Math.random() * state.wallHeight;
-            positions[i*3+2] = (Math.random() - 0.5) * state.mazeSize * state.cellSize;
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const dustParticles = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x888888, size: 0.05, transparent: true, opacity: 0.3 }));
-        scene.add(dustParticles);
     }
 
     function updateCamera() {
@@ -587,7 +651,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         if (state.isPlaying) {
             movePlayer(delta);
-            playerLight.intensity = 1.5 + Math.sin(time * 10) * 0.1 + Math.sin(time * 23) * 0.05;
+            playerLight.intensity = 0.8 + Math.sin(time * 10) * 0.1 + Math.sin(time * 23) * 0.05;
             if (playerMesh) playerMesh.position.y = Math.sin(time * 3) * 0.03;
         }
         renderer.render(scene, camera);
@@ -667,6 +731,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const peerOptions = {
             debug: 2,
             secure: true,
+            serialization: 'json',
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -679,11 +744,11 @@ window.addEventListener('DOMContentLoaded', () => {
         
         peer.on('open', (id) => {
             myId = id;
-            const conn = peer.connect(hostCode, { reliable: true }); // Reliable for game data
+            const conn = peer.connect(hostCode); 
             myConn = conn;
             
             conn.on('error', (err) => {
-                joinError.textContent = "INVALID CODE";
+                joinError.textContent = "Connection failed.";
                 joinError.style.display = 'block';
                 showScreen('join');
             });
@@ -694,8 +759,10 @@ window.addEventListener('DOMContentLoaded', () => {
         peer.on('error', (err) => {
             if (err.type === 'peer-unavailable') {
                 joinError.textContent = "INVALID CODE";
+            } else if (err.type === 'network') {
+                joinError.textContent = "NETWORK ERROR (Check Firewall)";
             } else {
-                joinError.textContent = "CONNECTION ERROR";
+                joinError.textContent = "ERROR: " + err.type;
             }
             joinError.style.display = 'block';
             showScreen('join');
