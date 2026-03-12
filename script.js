@@ -71,14 +71,14 @@ window.addEventListener('DOMContentLoaded', () => {
         const torsoGeo = new THREE.BoxGeometry(0.6, 0.8, 0.35);
         const torso = new THREE.Mesh(torsoGeo, suitMat); torso.position.y = 1.0; group.add(torso);
 
-        // Symbol (Chest) - Front is -Z
+        // Symbol (Chest)
         const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(32, 32, 5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(32, 32, 10, 25, 0, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.ellipse(32, 32, 10, 25, Math.PI/3, 0, Math.PI * 2); ctx.stroke();
         const symbolTexture = new THREE.CanvasTexture(canvas);
         const symbolMatText = new THREE.MeshBasicMaterial({ map: symbolTexture, transparent: true });
         const symbol = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), symbolMatText); 
-        symbol.position.set(0, 1.1, -0.18); // Front (-Z)
+        symbol.position.set(0, 1.1, -0.18);
         group.add(symbol);
 
         // Legs & Boots
@@ -93,10 +93,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const helmetGeo = new THREE.SphereGeometry(0.3, 16, 16);
         const helmet = new THREE.Mesh(helmetGeo, suitMat); helmet.position.y = 1.65; helmet.scale.set(1, 1.1, 1); group.add(helmet);
 
-        // Visor (Face) - Front is -Z
+        // Visor (Face)
         const visorGeo = new THREE.SphereGeometry(0.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
         const visor = new THREE.Mesh(visorGeo, visorMat); 
-        visor.position.set(0, 1.65, -0.05); // Front (-Z)
+        visor.position.set(0, 1.65, -0.05); 
         visor.rotation.x = -Math.PI / 2; visor.scale.set(0.8, 1, 1); 
         group.add(visor);
 
@@ -108,10 +108,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const leftGlove = new THREE.Mesh(gloveGeo, blackMat); leftGlove.position.set(-0.45, 0.7, 0); group.add(leftGlove);
         const rightGlove = new THREE.Mesh(gloveGeo, blackMat); rightGlove.position.set(0.45, 0.7, 0); group.add(rightGlove);
 
-        // Tank (Back) - Back is +Z
+        // Tank (Back)
         const tankGeo = new THREE.CapsuleGeometry(0.15, 0.3, 4, 8);
         const tank = new THREE.Mesh(tankGeo, suitMat); 
-        tank.position.set(0, 1.1, 0.25); // Back (+Z)
+        tank.position.set(0, 1.1, 0.25); 
         group.add(tank);
 
         return group;
@@ -121,8 +121,56 @@ window.addEventListener('DOMContentLoaded', () => {
     function generateMaze(width, height) { const grid = []; for (let y = 0; y < height; y++) { grid[y] = []; for (let x = 0; x < width; x++) grid[y][x] = 1; } function carve(x, y) { grid[y][x] = 0; const directions = [[0, -2], [0, 2], [-2, 0], [2, 0]].sort(() => Math.random() - 0.5); for (const [dx, dy] of directions) { const nx = x + dx, ny = y + dy; if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && grid[ny][nx] === 1) { grid[y + dy/2][x + dx/2] = 0; carve(nx, ny); } } } carve(1, 1); for (let y = 0; y < height; y++) { for (let x = 0; x < width; x++) { if (y === 0 || y === height - 1 || x === 0 || x === width - 1) grid[y][x] = 1; } } return grid; }
 
     // Multiplayer
-    function initNetworking(hosting) { if (typeof Peer === 'undefined') { alert("Multiplayer failed to load."); return; } const peerOptions = { debug: 2, secure: true, serialization: 'json', config: { iceServers: [ { urls: 'stun:stun.l.google.com:19302' } ] } }; if (hosting) { const roomCode = generateRoomCode(); peer = new Peer(roomCode, peerOptions); isHost = true; myColorIndex = 0; peer.on('open', (id) => { myId = id; lobbyCodeDisplay.textContent = id; showScreen('host'); maze = generateMaze(state.mazeSize, state.mazeSize); }); peer.on('error', (err) => { console.error(err); alert('Error: ' + err.type); showScreen('menu'); }); peer.on('connection', (conn) => { if (connections.length >= 7) return; setupConnection(conn); }); } }
-    function setupConnection(conn) { conn.on('open', () => { if (isHost) { connections.push(conn); const colorIndex = connections.length; const currentPlayers = {}; currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 }; for (let id in otherPlayers) currentPlayers[id] = otherPlayers[id]; conn.send({ type: 'init', data: maze, yourColorIndex: colorIndex, players: currentPlayers }); broadcastData({ type: 'new-player', id: conn.peer, colorIndex: colorIndex }, conn.peer); } else { myConn = conn; showScreen('waiting'); } }); conn.on('data', (data) => handleData(data, conn.peer)); conn.on('close', () => { if (isHost) { connections = connections.filter(c => c.peer !== conn.peer); removeOtherPlayer(conn.peer); } else { alert("Host disconnected."); location.reload(); } }); conn.on('error', (err) => { if (!isHost) { joinError.textContent = "Connection failed."; joinError.style.display = 'block'; showScreen('join'); } }); }
+    function initNetworking(hosting) { 
+        if (typeof Peer === 'undefined') { alert("Multiplayer failed to load."); return; } 
+        
+        const peerOptions = { 
+            debug: 2, 
+            secure: true, 
+            serialization: 'json', 
+            config: { 
+                iceServers: [ 
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ] 
+            } 
+        }; 
+
+        if (hosting) { 
+            const roomCode = generateRoomCode(); 
+            peer = new Peer(roomCode, peerOptions); 
+            isHost = true; 
+            myColorIndex = 0; 
+            
+            peer.on('open', (id) => { 
+                myId = id; 
+                lobbyCodeDisplay.textContent = id; 
+                showScreen('host'); 
+                maze = generateMaze(state.mazeSize, state.mazeSize); 
+            }); 
+            
+            peer.on('error', (err) => { 
+                console.error(err); 
+                let errMsg = "Connection Error: " + err.type;
+                if (err.type === 'network' || err.type === 'server-error') {
+                    errMsg = "NETWORK BLOCKED: Your network (School/Work) is blocking the game connection.\nTry using a Mobile Hotspot.";
+                } else if (err.type === 'unavailable-id') {
+                    lobbyCodeDisplay.textContent = "RETRY...";
+                    initNetworking(true);
+                    return;
+                }
+                alert(errMsg); 
+                showScreen('menu'); 
+            }); 
+            
+            peer.on('connection', (conn) => { 
+                if (connections.length >= 7) return; 
+                setupConnection(conn); 
+            }); 
+        } 
+    }
+
+    function setupConnection(conn) { conn.on('open', () => { if (isHost) { connections.push(conn); const colorIndex = connections.length; const currentPlayers = {}; currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 }; for (let id in otherPlayers) currentPlayers[id] = otherPlayers[id]; conn.send({ type: 'init', data: maze, yourColorIndex: colorIndex, players: currentPlayers }); broadcastData({ type: 'new-player', id: conn.peer, colorIndex: colorIndex }, conn.peer); } else { myConn = conn; showScreen('waiting'); } }); conn.on('data', (data) => handleData(data, conn.peer)); conn.on('close', () => { if (isHost) { connections = connections.filter(c => c.peer !== conn.peer); removeOtherPlayer(conn.peer); } else { alert("Host disconnected."); location.reload(); } }); conn.on('error', (err) => { if (!isHost) { joinError.textContent = "Connection failed (Firewall/Network)."; joinError.style.display = 'block'; showScreen('join'); } }); }
     function handleData(data, senderId) { if (data.type === 'init') { maze = data.data; myColorIndex = data.yourColorIndex; for (let id in data.players) updateOtherPlayer(id, data.players[id].x, data.players[id].z, data.players[id].angle, data.players[id].colorIndex); } else if (data.type === 'new-player') { if (!otherPlayers[senderId]) otherPlayers[senderId] = { colorIndex: data.colorIndex }; } else if (data.type === 'player-left') { removeOtherPlayer(data.id); } else if (data.type === 'start') { startGame(); } else if (data.type === 'move') { updateOtherPlayer(data.id, data.x, data.z, data.angle, data.colorIndex); if (isHost) broadcastData(data, senderId); } else if (data.type === 'error') { alert(data.msg); if(peer) peer.destroy(); showScreen('menu'); } }
     function sendData(data) { data.colorIndex = myColorIndex; if (myConn && myConn.open) myConn.send(data); }
     function broadcastData(data, excludeId = null) { connections.forEach(conn => { if (conn.open && conn.peer !== excludeId) conn.send(data); }); }
@@ -135,33 +183,32 @@ window.addEventListener('DOMContentLoaded', () => {
     function createWalls() { walls.forEach(w => scene.remove(w)); walls = []; const wallTexture = createNoiseTexture('#C8B870', 15, 64); const wallMat = new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 0.8 }); for (let y = 0; y < state.mazeSize; y++) { for (let x = 0; x < state.mazeSize; x++) { if (maze[y][x] === 1) { const wall = new THREE.Mesh(new THREE.BoxGeometry(state.cellSize, state.wallHeight, state.cellSize), wallMat); wall.position.set(x * state.cellSize + state.cellSize/2, state.wallHeight/2, y * state.cellSize + state.cellSize/2); scene.add(wall); walls.push(wall); } } } }
     
     function updateCamera() {
-        // Handle Look Behind
         if (state.keys.lookBehind) {
-            // Camera moves in front of player
-            const dist = 3.5; // Distance in front
+            // LOOK BEHIND MODE
+            const dist = 3.5; 
             const targetX = player.x - Math.sin(player.angle) * dist;
             const targetZ = player.z - Math.cos(player.angle) * dist;
             
             camera.position.set(targetX, 1.8, targetZ);
-            camera.lookAt(new THREE.Vector3(player.x, 1.0, player.z)); // Look at body center
+            camera.lookAt(new THREE.Vector3(player.x, 1.0, player.z)); 
             
-            // Make sure player mesh is visible
             if(playerMesh) playerMesh.visible = true;
         } else {
-            // Standard FPS view
-            camera.position.x = player.x;
-            camera.position.z = player.z;
-            camera.rotation.y = player.angle;
+            // FIRST PERSON MODE
+            camera.position.set(player.x, 1.5, player.z);
             
-            // Hide player mesh in FPS mode to avoid clipping
-            // (Optional: keep true if you want to see your body looking down)
+            // FIX: Reset rotation on all axes (X, Y, Z) to prevent slanting
+            camera.rotation.set(0, player.angle, 0);
+            
             if(playerMesh) playerMesh.visible = false;
         }
         
         playerLight.position.set(player.x, 2, player.z);
         
-        // Update player mesh position
-        if (playerMesh) { playerMesh.position.set(player.x, 0, player.z); playerMesh.rotation.y = player.angle; }
+        if (playerMesh) { 
+            playerMesh.position.set(player.x, 0, player.z); 
+            playerMesh.rotation.y = player.angle; 
+        }
     }
 
     function checkCollision(newX, newZ) { const margin = 0.4; const gx = Math.floor(newX / state.cellSize); const gz = Math.floor(newZ / state.cellSize); for (let dz = -1; dz <= 1; dz++) { for (let dx = -1; dx <= 1; dx++) { const cx = gx + dx, cz = gz + dz; if (cx >= 0 && cx < state.mazeSize && cz >= 0 && cz < state.mazeSize && maze[cz][cx] === 1) { const wMinX = cx * state.cellSize, wMaxX = wMinX + state.cellSize; const wMinZ = cz * state.cellSize, wMaxZ = wMinZ + state.cellSize; if (newX + margin > wMinX && newX - margin < wMaxX && newZ + margin > wMinZ && newZ - margin < wMaxZ) return true; } } } return false; }
@@ -196,7 +243,7 @@ window.addEventListener('DOMContentLoaded', () => {
         
         if (moveX !== 0 || moveZ !== 0) { state.distance += Math.sqrt(moveX*moveX + moveZ*moveZ); distanceCounter.textContent = Math.floor(state.distance); }
         
-        updateCamera(); // Update camera position based on lookBehind state
+        updateCamera(); 
 
         if (isHost) { broadcastData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle, colorIndex: myColorIndex }); } else if (myConn && myConn.open) { sendData({ type: 'move', id: myId, x: player.x, z: player.z, angle: player.angle }); }
     }
@@ -210,7 +257,52 @@ window.addEventListener('DOMContentLoaded', () => {
     hostBtn.addEventListener('click', () => { initNetworking(true); });
     lobbyStartBtn.addEventListener('click', () => { startGame(); broadcastData({ type: 'start' }); });
     joinMenuBtn.addEventListener('click', () => { joinError.style.display = 'none'; showScreen('join'); });
-    joinBtn.addEventListener('click', () => { const hostCode = joinInput.value.trim(); if (!hostCode) { joinError.textContent = "PLEASE ENTER A CODE"; joinError.style.display = 'block'; return; } if (typeof Peer === 'undefined') { alert("Multiplayer failed to load."); return; } isHost = false; joinError.style.display = 'none'; const peerOptions = { debug: 2, secure: true, serialization: 'json', config: { iceServers: [ { urls: 'stun:stun.l.google.com:19302' } ] } }; peer = new Peer(peerOptions); peer.on('open', (id) => { myId = id; const conn = peer.connect(hostCode); myConn = conn; conn.on('error', () => { joinError.textContent = "CONNECTION FAILED"; joinError.style.display = 'block'; showScreen('join'); }); setupConnection(conn); }); peer.on('error', (err) => { if (err.type === 'peer-unavailable') joinError.textContent = "INVALID CODE"; else joinError.textContent = "ERROR: " + err.type; joinError.style.display = 'block'; showScreen('join'); }); });
+    
+    joinBtn.addEventListener('click', () => { 
+        const hostCode = joinInput.value.trim();
+        if (!hostCode) { joinError.textContent = "PLEASE ENTER A CODE"; joinError.style.display = 'block'; return; } 
+        if (typeof Peer === 'undefined') { alert("Multiplayer failed to load."); return; } 
+        isHost = false; joinError.style.display = 'none'; 
+        
+        const peerOptions = { 
+            debug: 2, 
+            secure: true, 
+            serialization: 'json', 
+            config: { 
+                iceServers: [ 
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ] 
+            } 
+        }; 
+        
+        peer = new Peer(peerOptions); 
+        
+        peer.on('open', (id) => { 
+            myId = id; 
+            const conn = peer.connect(hostCode); 
+            myConn = conn; 
+            conn.on('error', () => { 
+                joinError.textContent = "CONNECTION FAILED"; 
+                joinError.style.display = 'block'; 
+                showScreen('join'); 
+            }); 
+            setupConnection(conn); 
+        }); 
+        
+        peer.on('error', (err) => { 
+            let errMsg = "ERROR: " + err.type;
+            if (err.type === 'peer-unavailable') {
+                errMsg = "INVALID CODE";
+            } else if (err.type === 'network' || err.type === 'server-error') {
+                errMsg = "NETWORK BLOCKED: Your network is blocking game connections.\nTry using a Mobile Hotspot.";
+            }
+            joinError.textContent = errMsg; 
+            joinError.style.display = 'block'; 
+            showScreen('join'); 
+        }); 
+    });
+    
     guideBtn.addEventListener('click', () => showScreen('guide')); backBtn.addEventListener('click', () => showScreen('menu')); backFromJoinBtn.addEventListener('click', () => showScreen('menu'));
     backFromLobbyBtn.addEventListener('click', () => { if(peer) peer.destroy(); peer = null; isHost = false; showScreen('menu'); });
     backFromWaitingBtn.addEventListener('click', () => { if(peer) peer.destroy(); peer = null; myConn = null; showScreen('menu'); });
