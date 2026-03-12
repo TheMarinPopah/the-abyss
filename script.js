@@ -20,6 +20,7 @@ window.addEventListener('DOMContentLoaded', () => {
         stamina: 30,
         maxStamina: 30,
         staminaRefillTime: 10, // Seconds to refill full bar
+        staminaDrainTime: 5,   // Seconds to empty full bar
         sprintMultiplier: 1.5
     };
 
@@ -141,7 +142,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const torsoGeo = new THREE.BoxGeometry(0.6, 0.8, 0.35);
         const torso = new THREE.Mesh(torsoGeo, suitMat); torso.position.y = 1.0; group.add(torso);
 
-        // Symbol
+        // Symbol (Chest) - NOW ON -Z (Front)
         const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -151,7 +152,9 @@ window.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath(); ctx.ellipse(32, 32, 10, 25, Math.PI/3, 0, Math.PI * 2); ctx.stroke();
         const symbolTexture = new THREE.CanvasTexture(canvas);
         const symbolMatText = new THREE.MeshBasicMaterial({ map: symbolTexture, transparent: true });
-        const symbol = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), symbolMatText); symbol.position.set(0, 1.1, 0.18); group.add(symbol);
+        const symbol = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), symbolMatText); 
+        symbol.position.set(0, 1.1, -0.18); // Front is -Z
+        group.add(symbol);
 
         // Legs & Boots
         const legGeo = new THREE.CapsuleGeometry(0.15, 0.5, 4, 8);
@@ -165,9 +168,13 @@ window.addEventListener('DOMContentLoaded', () => {
         const helmetGeo = new THREE.SphereGeometry(0.3, 16, 16);
         const helmet = new THREE.Mesh(helmetGeo, suitMat); helmet.position.y = 1.65; helmet.scale.set(1, 1.1, 1); group.add(helmet);
 
-        // Visor
+        // Visor (Face) - NOW ON -Z (Front)
         const visorGeo = new THREE.SphereGeometry(0.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-        const visor = new THREE.Mesh(visorGeo, visorMat); visor.position.set(0, 1.65, 0.05); visor.rotation.x = Math.PI / 2; visor.scale.set(0.8, 1, 1); group.add(visor);
+        const visor = new THREE.Mesh(visorGeo, visorMat); 
+        visor.position.set(0, 1.65, -0.05); // Front is -Z
+        visor.rotation.x = -Math.PI / 2; // Rotate to face -Z
+        visor.scale.set(0.8, 1, 1); 
+        group.add(visor);
 
         // Arms & Gloves
         const armGeo = new THREE.CapsuleGeometry(0.1, 0.4, 4, 8);
@@ -177,12 +184,11 @@ window.addEventListener('DOMContentLoaded', () => {
         const leftGlove = new THREE.Mesh(gloveGeo, blackMat); leftGlove.position.set(-0.45, 0.7, 0); group.add(leftGlove);
         const rightGlove = new THREE.Mesh(gloveGeo, blackMat); rightGlove.position.set(0.45, 0.7, 0); group.add(rightGlove);
 
-        // Tank
+        // Tank (Back) - NOW ON +Z (Back)
         const tankGeo = new THREE.CapsuleGeometry(0.15, 0.3, 4, 8);
-        const tank = new THREE.Mesh(tankGeo, suitMat); tank.position.set(0, 1.1, -0.25); group.add(tank);
-
-        // FIX: Rotate 180 degrees to face forward (towards -Z)
-        group.rotation.y = Math.PI;
+        const tank = new THREE.Mesh(tankGeo, suitMat); 
+        tank.position.set(0, 1.1, 0.25); // Back is +Z
+        group.add(tank);
 
         return group;
     }
@@ -332,18 +338,16 @@ window.addEventListener('DOMContentLoaded', () => {
         if (state.keys.right) player.angle -= state.turnSpeed;
         
         let currentSpeed = state.moveSpeed;
-        let isMoving = false;
 
         // Stamina Logic
-        // Regen rate: MaxStamina / RefillTime = 3 units per second
         const regenRate = state.maxStamina / state.staminaRefillTime;
+        const drainRate = state.maxStamina / state.staminaDrainTime; // Drains in 5 seconds
 
         if (state.keys.shift && state.stamina > 0 && state.keys.forward) {
             currentSpeed *= state.sprintMultiplier;
-            state.stamina -= delta;
+            state.stamina -= drainRate * delta; // Drain fast
             if (state.stamina < 0) state.stamina = 0;
         } else if (!state.keys.forward && !state.keys.backward) {
-            // Only recharge if standing still
             state.stamina += regenRate * delta;
             if (state.stamina > state.maxStamina) state.stamina = state.maxStamina;
         }
@@ -355,8 +359,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         let moveX = 0, moveZ = 0;
-        if (state.keys.forward) { moveX -= Math.sin(player.angle) * currentSpeed * delta; moveZ -= Math.cos(player.angle) * currentSpeed * delta; isMoving = true; }
-        if (state.keys.backward) { moveX += Math.sin(player.angle) * currentSpeed * delta; moveZ += Math.cos(player.angle) * currentSpeed * delta; isMoving = true; }
+        if (state.keys.forward) { moveX -= Math.sin(player.angle) * currentSpeed * delta; moveZ -= Math.cos(player.angle) * currentSpeed * delta; }
+        if (state.keys.backward) { moveX += Math.sin(player.angle) * currentSpeed * delta; moveZ += Math.cos(player.angle) * currentSpeed * delta; }
         
         if (!checkCollision(player.x + moveX, player.z)) player.x += moveX;
         if (!checkCollision(player.x, player.z + moveZ)) player.z += moveZ;
