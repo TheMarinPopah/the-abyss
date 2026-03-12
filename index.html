@@ -13,7 +13,6 @@
             <h1 class="game-title">THE ABYSS</h1>
             <p class="subtitle">Survive the dark together.</p>
             
-            <!-- MODE SLIDER -->
             <div class="mode-slider-container">
                 <div class="slider-labels">
                     <span id="label-single" class="slider-label active">SINGLE PLAYER</span>
@@ -24,13 +23,11 @@
                 </div>
             </div>
 
-            <!-- SINGLE PLAYER BUTTONS -->
             <div id="single-player-controls" class="menu-buttons active">
                 <button id="start-btn" class="btn btn-primary">START</button>
                 <button id="guide-btn" class="btn btn-secondary">GUIDE</button>
             </div>
 
-            <!-- MULTIPLAYER BUTTONS -->
             <div id="multiplayer-controls" class="menu-buttons">
                 <button id="host-btn" class="btn btn-secondary">HOST GAME</button>
                 <button id="join-menu-btn" class="btn btn-secondary">JOIN GAME</button>
@@ -39,10 +36,9 @@
         <div class="fog-overlay"></div>
     </div>
 
-    <!-- HOST SCREEN (New Layout) -->
+    <!-- HOST SCREEN -->
     <div id="host-screen" class="screen">
         <div class="host-lobby-container">
-            <!-- The Top Bar -->
             <div class="lobby-bar">
                 <h1 class="lobby-title">THE ABYSS</h1>
                 <div class="lobby-code-area">
@@ -51,7 +47,6 @@
                 </div>
                 <button id="lobby-start-btn" class="btn btn-primary">START GAME</button>
             </div>
-            
             <p class="lobby-hint">Waiting for friends to join...</p>
             <button id="back-from-lobby-btn" class="btn btn-secondary" style="margin-top: 2rem;">CANCEL</button>
         </div>
@@ -102,6 +97,10 @@
                     <span class="key-group"><span class="key">D</span> / <span class="key">RIGHT</span></span>
                     <span class="control-desc">Turn Right</span>
                 </div>
+                <div class="control-item">
+                    <span class="key-group"><span class="key">SHIFT</span></span>
+                    <span class="control-desc">Sprint (Drains Stamina)</span>
+                </div>
             </div>
             <button id="back-btn" class="btn btn-secondary">BACK</button>
         </div>
@@ -114,6 +113,13 @@
             <div class="hud-item">
                 <span class="hud-label">DISTANCE</span>
                 <span id="distance-counter" class="hud-value">0</span>
+            </div>
+            <!-- STAMINA BAR -->
+            <div class="hud-item" style="margin-top: 15px;">
+                <span class="hud-label">STAMINA</span>
+                <div class="stamina-bar-bg">
+                    <div id="stamina-bar" class="stamina-bar-fill"></div>
+                </div>
             </div>
         </div>
         <div class="vignette"></div>
