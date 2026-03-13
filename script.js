@@ -170,12 +170,91 @@ window.addEventListener('DOMContentLoaded', () => {
         } 
     }
 
-    function setupConnection(conn) { conn.on('open', () => { if (isHost) { connections.push(conn); const colorIndex = connections.length; const currentPlayers = {}; currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 }; for (let id in otherPlayers) currentPlayers[id] = otherPlayers[id]; conn.send({ type: 'init', data: maze, yourColorIndex: colorIndex, players: currentPlayers }); broadcastData({ type: 'new-player', id: conn.peer, colorIndex: colorIndex }, conn.peer); } else { myConn = conn; showScreen('waiting'); } }); conn.on('data', (data) => handleData(data, conn.peer)); conn.on('close', () => { if (isHost) { connections = connections.filter(c => c.peer !== conn.peer); removeOtherPlayer(conn.peer); } else { alert("Host disconnected."); location.reload(); } }); conn.on('error', (err) => { if (!isHost) { joinError.textContent = "Connection failed (Firewall/Network)."; joinError.style.display = 'block'; showScreen('join'); } }); }
-    function handleData(data, senderId) { if (data.type === 'init') { maze = data.data; myColorIndex = data.yourColorIndex; for (let id in data.players) updateOtherPlayer(id, data.players[id].x, data.players[id].z, data.players[id].angle, data.players[id].colorIndex); } else if (data.type === 'new-player') { if (!otherPlayers[senderId]) otherPlayers[senderId] = { colorIndex: data.colorIndex }; } else if (data.type === 'player-left') { removeOtherPlayer(data.id); } else if (data.type === 'start') { startGame(); } else if (data.type === 'move') { updateOtherPlayer(data.id, data.x, data.z, data.angle, data.colorIndex); if (isHost) broadcastData(data, senderId); } else if (data.type === 'error') { alert(data.msg); if(peer) peer.destroy(); showScreen('menu'); } }
+    function setupConnection(conn) { 
+        conn.on('open', () => { 
+            if (isHost) { 
+                connections.push(conn); 
+                const colorIndex = connections.length; 
+                const currentPlayers = {}; 
+                // Add Host data
+                currentPlayers[myId] = { x: player.x, z: player.z, angle: player.angle, colorIndex: 0 }; 
+                // Add all other players data (Host's perspective)
+                for (let id in otherPlayers) {
+                    // Send only position data, not the mesh object
+                    currentPlayers[id] = { 
+                        x: otherPlayers[id].x, 
+                        z: otherPlayers[id].z, 
+                        angle: otherPlayers[id].angle, 
+                        colorIndex: otherPlayers[id].colorIndex 
+                    }; 
+                }
+                conn.send({ type: 'init', data: maze, yourColorIndex: colorIndex, players: currentPlayers }); 
+                broadcastData({ type: 'new-player', id: conn.peer, colorIndex: colorIndex }, conn.peer); 
+            } else { 
+                myConn = conn; 
+                showScreen('waiting'); 
+            } 
+        }); 
+        conn.on('data', (data) => handleData(data, conn.peer)); 
+        conn.on('close', () => { if (isHost) { connections = connections.filter(c => c.peer !== conn.peer); removeOtherPlayer(conn.peer); } else { alert("Host disconnected."); location.reload(); } }); 
+        conn.on('error', (err) => { if (!isHost) { joinError.textContent = "Connection failed (Firewall/Network)."; joinError.style.display = 'block'; showScreen('join'); } }); 
+    }
+
+    function handleData(data, senderId) { 
+        if (data.type === 'init') { 
+            maze = data.data; 
+            myColorIndex = data.yourColorIndex; 
+            for (let id in data.players) {
+                let p = data.players[id];
+                updateOtherPlayer(id, p.x, p.z, p.angle, p.colorIndex);
+            }
+        } 
+        else if (data.type === 'new-player') { 
+            // Just create the data slot if it doesn't exist. 
+            // The mesh will be created when movement data arrives.
+            if (!otherPlayers[senderId]) {
+                otherPlayers[senderId] = { colorIndex: data.colorIndex, x: 0, z: 0, angle: 0 }; 
+            }
+        } 
+        else if (data.type === 'player-left') { 
+            removeOtherPlayer(data.id); 
+        } 
+        else if (data.type === 'start') { 
+            startGame(); 
+        } 
+        else if (data.type === 'move') { 
+            updateOtherPlayer(data.id, data.x, data.z, data.angle, data.colorIndex); 
+            if (isHost) broadcastData(data, senderId); 
+        } 
+        else if (data.type === 'error') { alert(data.msg); if(peer) peer.destroy(); showScreen('menu'); } 
+    }
+
     function sendData(data) { data.colorIndex = myColorIndex; if (myConn && myConn.open) myConn.send(data); }
     function broadcastData(data, excludeId = null) { connections.forEach(conn => { if (conn.open && conn.peer !== excludeId) conn.send(data); }); }
-    function updateOtherPlayer(id, x, z, angle, colorIndex) { if (id === myId) return; if (!otherPlayers[id]) { const cIdx = (colorIndex !== undefined) ? colorIndex : 1; const mesh = createCharacterMesh(playerColors[cIdx] || playerColors[1]); scene.add(mesh); otherPlayers[id] = { mesh, x, z, angle, colorIndex: cIdx }; } otherPlayers[id].mesh.position.set(x, 0, z); otherPlayers[id].mesh.rotation.y = angle; otherPlayers[id].x = x; otherPlayers[id].z = z; otherPlayers[id].angle = angle; }
-    function removeOtherPlayer(id) { if (otherPlayers[id]) { scene.remove(otherPlayers[id].mesh); delete otherPlayers[id]; } }
+    
+    function updateOtherPlayer(id, x, z, angle, colorIndex) { 
+        if (id === myId) return; 
+
+        // FIX: Check specifically for the mesh, not just the data object
+        if (!otherPlayers[id] || !otherPlayers[id].mesh) { 
+            const cIdx = (colorIndex !== undefined) ? colorIndex : (otherPlayers[id] ? otherPlayers[id].colorIndex : 1); 
+            const mesh = createCharacterMesh(playerColors[cIdx] || playerColors[1]); 
+            scene.add(mesh); 
+            
+            // Create or update the record
+            if(!otherPlayers[id]) otherPlayers[id] = {}; 
+            otherPlayers[id].mesh = mesh; 
+            otherPlayers[id].colorIndex = cIdx; 
+        } 
+
+        otherPlayers[id].mesh.position.set(x, 0, z); 
+        otherPlayers[id].mesh.rotation.y = angle; 
+        otherPlayers[id].x = x; 
+        otherPlayers[id].z = z; 
+        otherPlayers[id].angle = angle; 
+    }
+
+    function removeOtherPlayer(id) { if (otherPlayers[id] && otherPlayers[id].mesh) { scene.remove(otherPlayers[id].mesh); delete otherPlayers[id]; } }
 
     // Three.js
     function initThree() { scene = new THREE.Scene(); scene.background = new THREE.Color(0x807040); scene.fog = new THREE.Fog(0x807040, 1, 25); camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.y = 1.5; renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); gameContainer.appendChild(renderer.domElement); clock = new THREE.Clock(); const ambientLight = new THREE.AmbientLight(0x908060, 0.6); scene.add(ambientLight); playerLight = new THREE.PointLight(0xffffff, 0.8, 20); playerLight.castShadow = true; scene.add(playerLight); createFloor(); if (maze.length === 0) maze = generateMaze(state.mazeSize, state.mazeSize); createWalls(); playerMesh = createCharacterMesh(playerColors[myColorIndex]); scene.add(playerMesh); player.x = 1.5 * state.cellSize; player.z = 1.5 * state.cellSize; player.angle = 0; staminaBarUI = document.getElementById('stamina-bar'); state.stamina = state.maxStamina; updateCamera(); animate(); }
@@ -184,7 +263,6 @@ window.addEventListener('DOMContentLoaded', () => {
     
     function updateCamera() {
         if (state.keys.lookBehind) {
-            // LOOK BEHIND MODE
             const dist = 3.5; 
             const targetX = player.x - Math.sin(player.angle) * dist;
             const targetZ = player.z - Math.cos(player.angle) * dist;
@@ -194,10 +272,7 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if(playerMesh) playerMesh.visible = true;
         } else {
-            // FIRST PERSON MODE
             camera.position.set(player.x, 1.5, player.z);
-            
-            // FIX: Reset rotation on all axes (X, Y, Z) to prevent slanting
             camera.rotation.set(0, player.angle, 0);
             
             if(playerMesh) playerMesh.visible = false;
